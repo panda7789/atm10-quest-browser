@@ -1,0 +1,1457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ATM10 Quest Browser</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,300;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+/* ─── VARIABLES ─────────────────────────────────────────────────────── */
+:root {
+  --bg:        #0c0e14;
+  --bg2:       #12151e;
+  --bg3:       #191d28;
+  --bg4:       #1f2433;
+  --border:    #262d3f;
+  --border2:   #313b52;
+  --gold:      #d4a843;
+  --gold2:     #e8c060;
+  --gold-dim:  #7a5c20;
+  --gold-glow: rgba(212,168,67,0.12);
+  --text:      #c8bfa8;
+  --text-dim:  #6a6050;
+  --text-bright: #ede0c4;
+  --sidebar: 300px;
+  --header: 52px;
+}
+
+/* ─── RESET ──────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Source Serif 4', Georgia, serif;
+  background: var(--bg);
+  color: var(--text);
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ─── HEADER ─────────────────────────────────────────────────────────── */
+header {
+  height: var(--header);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 18px;
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  z-index: 10;
+}
+
+.logo {
+  font-family: 'Cinzel', serif;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--gold);
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+  text-shadow: 0 0 24px rgba(212,168,67,0.4);
+}
+
+.header-sep {
+  width: 1px;
+  height: 22px;
+  background: var(--border2);
+  flex-shrink: 0;
+}
+
+#chapterTitle {
+  font-family: 'Cinzel', serif;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  letter-spacing: 0.08em;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+.search-icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  pointer-events: none;
+}
+#searchInput {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 6px 10px 6px 28px;
+  color: var(--text);
+  font-family: 'Source Serif 4', serif;
+  font-size: 0.85rem;
+  width: 200px;
+  outline: none;
+  transition: border-color 0.2s, width 0.2s;
+}
+#searchInput:focus { border-color: var(--gold-dim); width: 260px; }
+#searchInput::placeholder { color: var(--text-dim); }
+
+/* ─── LAYOUT ─────────────────────────────────────────────────────────── */
+.layout {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* ─── SIDEBAR ────────────────────────────────────────────────────────── */
+.sidebar {
+  width: var(--sidebar);
+  flex-shrink: 0;
+  background: var(--bg2);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.sidebar-inner {
+  overflow-y: auto;
+  flex: 1;
+  padding: 6px 0 12px;
+}
+.sidebar-inner::-webkit-scrollbar { width: 3px; }
+.sidebar-inner::-webkit-scrollbar-track { background: transparent; }
+.sidebar-inner::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+/* Group headers */
+.group-header {
+  padding: 16px 14px 6px;
+  font-family: 'Cinzel', serif;
+  font-size: 0.6rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--gold-dim);
+  border-top: 1px solid var(--border);
+  margin-top: 8px;
+}
+.group-header:first-child { margin-top: 0; border-top: none; padding-top: 10px; }
+
+/* Chapter buttons */
+.chapter-btn {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 7px 14px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-dim);
+  font-size: 0.82rem;
+  font-family: 'Source Serif 4', serif;
+  text-align: left;
+  border-left: 2px solid transparent;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+}
+.chapter-btn:hover { color: var(--text); background: rgba(255,255,255,0.03); }
+.chapter-btn.active {
+  color: var(--gold2);
+  border-left-color: var(--gold);
+  background: var(--gold-glow);
+}
+.chapter-btn .ch-count {
+  margin-left: auto;
+  font-size: 0.7rem;
+  opacity: 0.5;
+  flex-shrink: 0;
+}
+.chapter-btn .ch-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+
+/* ─── MAP AREA ───────────────────────────────────────────────────────── */
+.map-area {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+  background: var(--bg);
+  background-image:
+    radial-gradient(circle at 20% 80%, rgba(212,168,67,0.03) 0%, transparent 50%),
+    radial-gradient(circle at 80% 20%, rgba(74,120,191,0.03) 0%, transparent 50%);
+}
+
+/* Canvas */
+#mapCanvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: grab;
+}
+#mapCanvas.grabbing { cursor: grabbing; }
+#mapCanvas.hovering { cursor: pointer; }
+
+/* Map controls */
+.map-controls {
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.map-btn {
+  width: 30px; height: 30px;
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  border-radius: 4px;
+  color: var(--text-dim);
+  font-size: 1rem;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: color 0.15s, border-color 0.15s;
+}
+.map-btn:hover { color: var(--text); border-color: var(--gold-dim); }
+
+/* Empty state */
+.empty-state {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 10px; color: var(--text-dim);
+  pointer-events: none;
+}
+.empty-state .big { font-size: 3rem; opacity: 0.2; }
+.empty-state p { font-style: italic; font-size: 0.95rem; opacity: 0.5; }
+
+/* ─── QUEST POPUP ────────────────────────────────────────────────────── */
+#popupBackdrop {
+  position: absolute; inset: 0;
+  z-index: 40;
+  display: none;
+}
+#popupBackdrop.open { display: block; }
+
+#questPopup {
+  position: absolute;
+  z-index: 41;
+  width: 460px;
+  max-width: calc(100vw - 340px);
+  max-height: calc(100vh - 80px);
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.7), 0 0 0 1px rgba(212,168,67,0.08);
+  display: none;
+  flex-direction: column;
+  overflow: hidden;
+  animation: popupIn 0.15s cubic-bezier(0.2,0,0,1);
+}
+#questPopup.open { display: flex; }
+@keyframes popupIn {
+  from { opacity: 0; transform: scale(0.96) translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.popup-header {
+  padding: 16px 40px 12px 18px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  position: relative;
+}
+.popup-close {
+  position: absolute;
+  top: 10px; right: 10px;
+  background: none; border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 1rem; padding: 4px 6px;
+  border-radius: 3px;
+  line-height: 1;
+  transition: color 0.15s, background 0.15s;
+}
+.popup-close:hover { color: var(--text); background: rgba(255,255,255,0.06); }
+
+.popup-title {
+  font-family: 'Cinzel', serif;
+  font-size: 1rem;
+  color: var(--gold2);
+  line-height: 1.35;
+}
+.popup-subtitle {
+  font-style: italic;
+  font-size: 0.82rem;
+  color: var(--text-dim);
+  margin-top: 3px;
+}
+
+.popup-body {
+  overflow-y: auto;
+  flex: 1;
+  padding: 16px 18px 20px;
+  min-height: 0;
+}
+.popup-body::-webkit-scrollbar { width: 3px; }
+.popup-body::-webkit-scrollbar-track { background: transparent; }
+.popup-body::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+/* Section label */
+.section-label {
+  font-family: 'Cinzel', serif;
+  font-size: 0.6rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-bottom: 8px;
+}
+
+/* Description */
+.quest-desc {
+  font-size: 0.88rem;
+  line-height: 1.75;
+  color: var(--text);
+  word-break: break-word;
+}
+
+.popup-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 14px 0;
+}
+
+/* Tasks */
+.task-list { display: flex; flex-direction: column; gap: 4px; }
+.task-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  font-size: 0.82rem;
+  color: var(--text-dim);
+}
+.task-item .t-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.task-item .t-count { font-size: 0.74rem; color: var(--gold-dim); flex-shrink: 0; }
+
+/* No desc */
+.no-desc { font-style: italic; font-size: 0.85rem; color: var(--text-dim); opacity: 0.6; }
+
+/* ─── MINECRAFT TEXT COLORS ──────────────────────────────────────────── */
+.mc-0 { color: #111; }
+.mc-1 { color: #0000aa; }
+.mc-2 { color: #59a05a; }
+.mc-3 { color: #55bfc8; }
+.mc-4 { color: #c44; }
+.mc-5 { color: #c45ab5; }
+.mc-6 { color: var(--gold); }
+.mc-7 { color: #aaa; }
+.mc-8 { color: #666; }
+.mc-9 { color: #6699ff; }
+.mc-a { color: #7ec87e; }
+.mc-b { color: #7ff5ff; }
+.mc-c { color: #ff6060; }
+.mc-d { color: #ff70ff; }
+.mc-e { color: #ffee77; }
+.mc-f { color: #f0e8d8; }
+.mc-bold { font-weight: 700; color: var(--text-bright); }
+.mc-italic { font-style: italic; }
+.mc-underline { text-decoration: underline; }
+.mc-strike { text-decoration: line-through; }
+
+/* ─── TOOLTIP ────────────────────────────────────────────────────────── */
+#tooltip {
+  position: fixed;
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  border-radius: 5px;
+  padding: 6px 10px;
+  font-size: 0.78rem;
+  color: var(--text);
+  pointer-events: none;
+  z-index: 100;
+  max-width: 220px;
+  display: none;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+}
+#tooltip .tt-title { color: var(--gold2); font-family: 'Cinzel', serif; font-size: 0.72rem; margin-bottom: 2px; }
+#tooltip .tt-sub { color: var(--text-dim); font-style: italic; }
+
+/* ─── MOBILE ─────────────────────────────────────────────────────────── */
+.sidebar-toggle {
+  display: none;
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 4px 6px;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+@media (max-width: 700px) {
+  :root { --sidebar: 280px; }
+
+  .sidebar-toggle { display: flex; align-items: center; }
+  .header-sep { display: none; }
+  #chapterTitle { font-size: 0.72rem; }
+  #searchInput { width: 140px; }
+  #searchInput:focus { width: 170px; }
+
+  /* Sidebar jako overlay drawer */
+  .sidebar {
+    position: fixed;
+    top: 0; left: 0; bottom: 0;
+    z-index: 80;
+    transform: translateX(-100%);
+    transition: transform 0.25s cubic-bezier(0.4,0,0.2,1);
+    box-shadow: 4px 0 24px rgba(0,0,0,0.6);
+  }
+  .sidebar.mobile-open { transform: translateX(0); }
+
+  /* Backdrop za sidebarom */
+  #sidebarBackdrop {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 79;
+  }
+  #sidebarBackdrop.open { display: block; }
+
+  /* Quest popup — fullscreen na mobilu */
+  #questPopup {
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: 100% !important;
+    border-radius: 0 !important;
+    top: 0 !important;
+    left: 0 !important;
+    z-index: 90;
+  }
+
+  /* Map controls — menší a výš kvůli popup */
+  .map-controls { bottom: 12px; right: 12px; }
+  .map-btn { width: 36px; height: 36px; font-size: 1.1rem; }
+
+  /* Tooltip skryjeme na mobilu (tap otevře rovnou popup) */
+  #tooltip { display: none !important; }
+}
+
+#loadingOverlay {
+  position: fixed; inset: 0;
+  background: var(--bg);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 16px; z-index: 200;
+}
+.spinner {
+  width: 40px; height: 40px;
+  border: 3px solid var(--border2);
+  border-top-color: var(--gold);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-text { font-family: 'Cinzel', serif; font-size: 0.8rem; color: var(--text-dim); letter-spacing: 0.1em; }
+
+/* ─── SEARCH OVERLAY ────────────────────────────────────────────────── */
+#searchOverlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(12,14,20,0.96);
+  z-index: 50;
+  display: none;
+  overflow-y: auto;
+  padding: 20px;
+}
+#searchOverlay.visible { display: block; }
+.search-results-title {
+  font-family: 'Cinzel', serif;
+  font-size: 0.7rem;
+  letter-spacing: 0.15em;
+  color: var(--text-dim);
+  margin-bottom: 12px;
+}
+.search-group-title {
+  font-size: 0.75rem;
+  color: var(--gold-dim);
+  font-family: 'Cinzel', serif;
+  letter-spacing: 0.06em;
+  margin: 14px 0 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+.search-result-item {
+  padding: 8px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-bottom: 2px;
+  transition: background 0.1s;
+}
+.search-result-item:hover { background: var(--bg3); }
+.sri-title { font-size: 0.88rem; color: var(--text-bright); }
+.sri-desc { font-size: 0.77rem; color: var(--text-dim); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+mark { background: rgba(212,168,67,0.25); color: var(--gold2); border-radius: 2px; padding: 0 1px; }
+.no-results { text-align: center; color: var(--text-dim); font-style: italic; padding: 40px 0; }
+</style>
+</head>
+<body>
+
+<!-- Loading -->
+<div id="loadingOverlay">
+  <div class="spinner"></div>
+  <div class="loading-text">Loading quest data…</div>
+</div>
+
+<!-- Header -->
+<header>
+  <button class="sidebar-toggle" id="sidebarToggle" title="Chapters">☰</button>
+  <div class="logo">⚔ ATM10</div>
+  <div class="header-sep"></div>
+  <div id="chapterTitle">Select a chapter</div>
+  <div class="search-wrap">
+    <span class="search-icon">🔍</span>
+    <input id="searchInput" type="text" placeholder="Search quests…" autocomplete="off">
+  </div>
+</header>
+
+<!-- Sidebar backdrop (mobile) -->
+<div id="sidebarBackdrop"></div>
+
+<!-- Layout -->
+<div class="layout">
+
+  <!-- Sidebar -->
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-inner" id="sidebarInner"></div>
+  </div>
+
+  <!-- Map -->
+  <div class="map-area" id="mapArea">
+    <canvas id="mapCanvas"></canvas>
+    <div class="empty-state" id="emptyState">
+      <div class="big">📜</div>
+      <p>Choose a chapter from the sidebar</p>
+    </div>
+    <div class="map-controls">
+      <button class="map-btn" id="btnZoomIn" title="Zoom in">+</button>
+      <button class="map-btn" id="btnZoomOut" title="Zoom out">−</button>
+      <button class="map-btn" id="btnFit" title="Fit to screen">⊡</button>
+      <button class="map-btn" id="btnDeps" title="Toggle dependency lines" style="font-size:0.7rem;letter-spacing:-0.02em;">DEP</button>
+    </div>
+
+    <!-- Quest popup -->
+    <div id="popupBackdrop"></div>
+    <div id="questPopup">
+      <div class="popup-header" id="popupHeader">
+        <button class="popup-close" id="popupClose">✕</button>
+      </div>
+      <div class="popup-body" id="popupBody"></div>
+    </div>
+
+    <!-- Search overlay -->
+    <div id="searchOverlay"></div>
+  </div>
+
+</div>
+
+<!-- Tooltip -->
+<div id="tooltip"></div>
+
+<script>
+'use strict';
+// ─── STATE ────────────────────────────────────────────────────────────────────
+let DATA = null;                 // loaded JSON
+let activeChapter = null;        // chapter object
+let selectedQuestId = null;      // string id
+
+// Map viewport
+let vpX = 0, vpY = 0, vpScale = 60;  // px per grid unit
+const MIN_SCALE = 15, MAX_SCALE = 140;
+
+// Deps display mode: 'all' | 'hover' | 'none'
+let depsMode = 'hover';  // default — méně nepřehledné
+
+// Drag state
+let isDragging = false, dragStartX = 0, dragStartY = 0, vpXStart = 0, vpYStart = 0;
+let hoveredQuestId = null;
+
+// Canvas
+const canvas = document.getElementById('mapCanvas');
+const ctx = canvas.getContext('2d');
+
+// ─── MINECRAFT COLOR RENDERER ─────────────────────────────────────────────────
+const MC_COLOR_MAP = {
+  '0':'#111','1':'#0055bb','2':'#59a05a','3':'#55bfc8',
+  '4':'#cc4444','5':'#c45ab5','6':'#d4a843','7':'#aaaaaa',
+  '8':'#555555','9':'#6699ff','a':'#7ec87e','b':'#7ff5ff',
+  'c':'#ff6060','d':'#ff70ff','e':'#ffee77','f':'#ede0c4'
+};
+
+function mcToHtml(text) {
+  if (!text) return '';
+  const parts = text.split(/&(?=[0-9a-fA-Flonmr])/);
+  let html = escHtml(parts[0]);
+  let activeColor = null;
+  for (let i = 1; i < parts.length; i++) {
+    const code = parts[i][0].toLowerCase();
+    const rest = parts[i].slice(1);
+    if (code === 'r') {
+      activeColor = null;
+      html += escHtml(rest);
+    } else if (code === 'l') {
+      html += `<span class="mc-bold">${escHtml(rest)}</span>`;
+    } else if (code === 'o') {
+      html += `<span class="mc-italic">${escHtml(rest)}</span>`;
+    } else if (code === 'n') {
+      html += `<span class="mc-underline">${escHtml(rest)}</span>`;
+    } else if (code === 'm') {
+      html += `<span class="mc-strike">${escHtml(rest)}</span>`;
+    } else if (MC_COLOR_MAP[code]) {
+      html += `<span class="mc-${code}">${escHtml(rest)}</span>`;
+    } else {
+      html += escHtml(parts[i]);
+    }
+  }
+  return html;
+}
+
+function stripMc(text) {
+  return text ? text.replace(/&[0-9a-fA-Flonmr]/g, '') : '';
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ─── ICONS ───────────────────────────────────────────────────────────────────
+// Dva módy:
+//   ATLAS  — jeden velký icons_atlas.png + icons_atlas.json (pro hosting)
+//   FILES  — individuální soubory icons/namespace/item.png  (po extract_icons.js)
+let ICON_MODE  = null;   // 'atlas' | 'files' | null
+let ATLAS_META = null;   // { tile, cols, rows, icons: { id: {x,y} } }
+let FILES_MAP  = null;   // { id: "icons/ns/name.png" }
+
+async function loadIcons() {
+  // Zkus nejdřív atlas (priorita — menší přenos pro hosting)
+  try {
+    const res = await fetch('icons_atlas.json');
+    if (res.ok) {
+      ATLAS_META = await res.json();
+      ICON_MODE = 'atlas';
+      console.log(`Icons: atlas mode (${Object.keys(ATLAS_META.icons).length} ikon)`);
+      return;
+    }
+  } catch {}
+
+  // Fallback: individuální soubory
+  try {
+    const res = await fetch('icons_manifest.json');
+    if (res.ok) {
+      FILES_MAP = await res.json();
+      ICON_MODE = 'files';
+      console.log(`Icons: files mode (${Object.keys(FILES_MAP).length} ikon)`);
+      return;
+    }
+  } catch {}
+  // Bez ikon — nevadí
+}
+
+function itemIcon(itemId, fallbackEmoji) {
+  if (!itemId) return `<span>${fallbackEmoji}</span>`;
+  const TILE = 20;  // px jak chceme zobrazit (16px textura, ale 20px plocha)
+
+  if (ICON_MODE === 'atlas') {
+    // Zkus přímý lookup + varianty
+    const entry = ATLAS_META.icons[itemId]
+      || ATLAS_META.icons[`${itemId}_item`]
+      || null;
+    if (entry) {
+      const srcTile = ATLAS_META.tile;
+      const scale   = TILE / srcTile;
+      const bgW     = ATLAS_META.width  * scale;
+      const bgH     = ATLAS_META.height * scale;
+      const bgX     = -(entry.x * scale);
+      const bgY     = -(entry.y * scale);
+      return `<span style="display:inline-block;width:${TILE}px;height:${TILE}px;flex-shrink:0;image-rendering:pixelated;background:url('icons_atlas.webp') ${bgX}px ${bgY}px / ${bgW}px ${bgH}px no-repeat;" title="${escHtml(itemId)}"></span>`;
+    }
+  }
+
+  if (ICON_MODE === 'files') {
+    const url = FILES_MAP[itemId] || FILES_MAP[`${itemId}_item`] || null;
+    if (url) {
+      return `<img src="${escHtml(url)}" alt="${escHtml(itemId)}" title="${escHtml(itemId)}" style="width:${TILE}px;height:${TILE}px;image-rendering:pixelated;vertical-align:middle;flex-shrink:0;" onerror="this.replaceWith(document.createTextNode('${fallbackEmoji}'))">`;
+    }
+  }
+
+  return `<span title="${escHtml(itemId)}">${fallbackEmoji}</span>`;
+}
+
+// ─── LOAD DATA ────────────────────────────────────────────────────────────────
+async function loadData() {
+  try {
+    const [questRes] = await Promise.all([
+      fetch('quests.json'),
+      loadIcons(),
+    ]);
+    if (!questRes.ok) throw new Error(`HTTP ${questRes.status}`);
+    DATA = await questRes.json();
+    document.getElementById('loadingOverlay').style.display = 'none';
+    buildSidebar();
+  } catch (e) {
+    document.getElementById('loadingOverlay').innerHTML =
+      `<div style="color:#ff6060;font-family:Cinzel,serif;font-size:0.9rem;max-width:320px;text-align:center;padding:20px;">
+        <div style="font-size:2rem;margin-bottom:12px">⚠️</div>
+        Cannot load <strong>quests.json</strong><br><br>
+        <small style="opacity:0.6">Make sure quests.json is in the same folder as this HTML file,<br>then open via a local server or browser that allows local file access.</small><br><br>
+        <small style="opacity:0.4">${escHtml(e.message)}</small>
+      </div>`;
+  }
+}
+
+// ─── SIDEBAR ──────────────────────────────────────────────────────────────────
+function buildSidebar() {
+  const el = document.getElementById('sidebarInner');
+  // Group chapters by group_title
+  const groups = {};
+  for (const ch of DATA.chapters) {
+    const g = ch.group_title || 'Other';
+    if (!groups[g]) groups[g] = [];
+    groups[g].push(ch);
+  }
+  // Sort groups, put Main Questline first
+  const groupOrder = ['Main Questline', ...Object.keys(groups).filter(g => g !== 'Main Questline' && g !== 'Other').sort(), 'Other'];
+
+  let html = '';
+  for (const g of groupOrder) {
+    if (!groups[g]) continue;
+    html += `<div class="group-header">${escHtml(g)}</div>`;
+    for (const ch of groups[g]) {
+      const title = stripMc(ch.title);
+      html += `<button class="chapter-btn" data-id="${escHtml(ch.id)}" onclick="selectChapter('${escHtml(ch.id)}')">
+        <span class="ch-name">${escHtml(title)}</span>
+        <span class="ch-count">${ch.quests.length}</span>
+      </button>`;
+    }
+  }
+  el.innerHTML = html;
+}
+
+// ─── SELECT CHAPTER ───────────────────────────────────────────────────────────
+function selectChapter(id) {
+  activeChapter = DATA.chapters.find(c => c.id === id);
+  if (!activeChapter) return;
+  selectedQuestId = null;
+  closePopup();
+
+  // Update sidebar active state
+  document.querySelectorAll('.chapter-btn').forEach(b => b.classList.toggle('active', b.dataset.id === id));
+  document.getElementById('chapterTitle').textContent = stripMc(activeChapter.title);
+  document.getElementById('emptyState').style.display = 'none';
+
+  fitChapter();
+  requestDraw();
+  hideSearch();
+
+  // Zavři sidebar na mobilu
+  document.getElementById('sidebar').classList.remove('mobile-open');
+  document.getElementById('sidebarBackdrop').classList.remove('open');
+}
+
+// ─── MAP: FIT TO CHAPTER ──────────────────────────────────────────────────────
+function fitChapter() {
+  if (!activeChapter || !activeChapter.quests.length) return;
+  const qs = activeChapter.quests;
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const q of qs) {
+    minX = Math.min(minX, q.x); maxX = Math.max(maxX, q.x);
+    minY = Math.min(minY, q.y); maxY = Math.max(maxY, q.y);
+  }
+  const W = canvas.width, H = canvas.height;
+  const rangeX = (maxX - minX) || 1;
+  const rangeY = (maxY - minY) || 1;
+  const pad = 3;
+  vpScale = Math.min(W / (rangeX + pad), H / (rangeY + pad), MAX_SCALE);
+  vpScale = Math.max(vpScale, MIN_SCALE);
+  vpX = W / 2 - ((minX + maxX) / 2) * vpScale;
+  vpY = H / 2 - ((minY + maxY) / 2) * vpScale;
+}
+
+// ─── CANVAS DRAW ──────────────────────────────────────────────────────────────
+function resizeCanvas() {
+  const area = document.getElementById('mapArea');
+  canvas.width = area.clientWidth;
+  canvas.height = area.clientHeight;
+}
+
+function worldToScreen(wx, wy) {
+  return [wx * vpScale + vpX, wy * vpScale + vpY];
+}
+
+function screenToWorld(sx, sy) {
+  return [(sx - vpX) / vpScale, (sy - vpY) / vpScale];
+}
+
+// Build dependency lookup for current chapter
+function buildDepMap(chapter) {
+  const map = {};
+  for (const q of chapter.quests) {
+    if (q.deps) {
+      for (const dep of q.deps) {
+        if (!map[dep]) map[dep] = [];
+        map[dep].push(q.id);
+      }
+    }
+  }
+  return map;
+}
+
+function draw() {
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  if (!activeChapter) return;
+
+  const quests = activeChapter.quests;
+  const questById = {};
+  for (const q of quests) questById[q.id] = q;
+
+  // ── Draw dependency lines ─────────────────────────────
+  const selectedQ = selectedQuestId ? questById[selectedQuestId] : null;
+  const hoveredQ  = hoveredQuestId  ? questById[hoveredQuestId]  : null;
+  const focusQ    = selectedQ || hoveredQ;
+
+  // Sety pro zvýrazněné uzly
+  const highlightDeps = new Set();  // předchůdci focusu
+  const highlightNext = new Set();  // následníci focusu
+  if (focusQ) {
+    for (const d of (focusQ.deps || [])) highlightDeps.add(d);
+    for (const q of quests) {
+      if (q.deps && q.deps.includes(focusQ.id)) highlightNext.add(q.id);
+    }
+  }
+
+  // 1. Pozadí linek — dle depsMode
+  if (depsMode === 'all' || (depsMode === 'hover' && !focusQ)) {
+    ctx.save();
+    ctx.globalAlpha = depsMode === 'all' && focusQ ? 0.06 : 0.18;
+    ctx.strokeStyle = '#7868a0';
+    ctx.lineWidth = 1;
+    for (const q of quests) {
+      if (!q.deps) continue;
+      const [sx, sy] = worldToScreen(q.x, q.y);
+      for (const depId of q.deps) {
+        const dep = questById[depId];
+        if (!dep) continue;
+        const [dx, dy] = worldToScreen(dep.x, dep.y);
+        ctx.beginPath(); ctx.moveTo(dx, dy); ctx.lineTo(sx, sy); ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+
+  // 2. Zvýrazněné linky pro focus (vždy, pokud je něco focusované)
+  if (focusQ) {
+    const [fx, fy] = worldToScreen(focusQ.x, focusQ.y);
+
+    // Předchůdci → focus (modré)
+    if (focusQ.deps && focusQ.deps.length) {
+      ctx.save();
+      ctx.strokeStyle = '#4a80e8';
+      ctx.lineWidth = 2;
+      ctx.globalAlpha = 0.85;
+      for (const depId of focusQ.deps) {
+        const dep = questById[depId];
+        if (!dep) continue;
+        const [dx, dy] = worldToScreen(dep.x, dep.y);
+        // Šipka pomocí offsetu
+        drawArrow(ctx, dx, dy, fx, fy, '#4a80e8');
+      }
+      ctx.restore();
+    }
+
+    // Focus → následníci (zlaté)
+    if (highlightNext.size) {
+      ctx.save();
+      ctx.strokeStyle = '#d4a843';
+      ctx.lineWidth = 2;
+      ctx.globalAlpha = 0.85;
+      for (const nid of highlightNext) {
+        const nq = questById[nid];
+        if (!nq) continue;
+        const [nx, ny] = worldToScreen(nq.x, nq.y);
+        drawArrow(ctx, fx, fy, nx, ny, '#d4a843');
+      }
+      ctx.restore();
+    }
+  }
+
+  // ── Draw quest nodes ──────────────────────────────────
+  const r = vpScale * 0.38;  // base radius
+  const font = Math.max(9, Math.min(13, vpScale * 0.2));
+
+  for (const q of quests) {
+    if (q.invisible) continue;
+    const [sx, sy] = worldToScreen(q.x, q.y);
+    const qr = r * (q.size || 1.0);
+
+    // Skip off-screen
+    if (sx + qr < 0 || sx - qr > W || sy + qr < 0 || sy - qr > H) continue;
+
+    const isSelected = q.id === selectedQuestId;
+    const isHovered = q.id === hoveredQuestId;
+    const hasDesc = q.desc && q.desc.length > 0;
+
+    // Colors
+    let fillColor, strokeColor;
+    if (isSelected) {
+      fillColor = 'rgba(212,168,67,0.25)';
+      strokeColor = '#d4a843';
+    } else if (isHovered) {
+      fillColor = 'rgba(255,255,255,0.08)';
+      strokeColor = '#a89870';
+    } else if (hasDesc) {
+      fillColor = 'rgba(74,100,140,0.2)';
+      strokeColor = '#4a6490';
+    } else {
+      fillColor = 'rgba(30,36,50,0.8)';
+      strokeColor = '#313b52';
+    }
+
+    ctx.save();
+    ctx.translate(sx, sy);
+
+    // Draw shape
+    drawShape(ctx, q.shape || 'rsquare', qr, fillColor, strokeColor, isSelected ? 2 : 1);
+
+    // Label (only if large enough)
+    if (vpScale >= 35 && q.title_plain) {
+      const label = q.title_plain.length > 18 ? q.title_plain.slice(0, 16) + '…' : q.title_plain;
+      ctx.font = `${font}px "Source Serif 4", serif`;
+      ctx.fillStyle = isSelected ? '#e8c060' : '#9a9080';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(label, 0, qr + font * 0.8);
+    }
+
+    // Glow for selected
+    if (isSelected) {
+      ctx.shadowBlur = 16;
+      ctx.shadowColor = '#d4a843';
+      drawShape(ctx, q.shape || 'rsquare', qr, 'transparent', '#d4a843', 1.5);
+      ctx.shadowBlur = 0;
+    }
+
+    ctx.restore();
+  }
+}
+
+function drawShape(ctx, shape, r, fill, stroke, lineW) {
+  ctx.beginPath();
+  switch (shape) {
+    case 'circle':
+      ctx.arc(0, 0, r, 0, Math.PI * 2);
+      break;
+
+    case 'diamond': {
+      const d = r * 1.1;
+      ctx.moveTo(0, -d); ctx.lineTo(d, 0); ctx.lineTo(0, d); ctx.lineTo(-d, 0);
+      ctx.closePath();
+      break;
+    }
+
+    case 'hexagon':
+      for (let i = 0; i < 6; i++) {
+        const a = (Math.PI / 3) * i - Math.PI / 6;
+        i === 0 ? ctx.moveTo(Math.cos(a)*r, Math.sin(a)*r) : ctx.lineTo(Math.cos(a)*r, Math.sin(a)*r);
+      }
+      ctx.closePath();
+      break;
+
+    case 'octagon':
+      for (let i = 0; i < 8; i++) {
+        const a = (Math.PI / 4) * i - Math.PI / 8;
+        i === 0 ? ctx.moveTo(Math.cos(a)*r, Math.sin(a)*r) : ctx.lineTo(Math.cos(a)*r, Math.sin(a)*r);
+      }
+      ctx.closePath();
+      break;
+
+    case 'pentagon':
+      for (let i = 0; i < 5; i++) {
+        const a = (Math.PI * 2 / 5) * i - Math.PI / 2;
+        i === 0 ? ctx.moveTo(Math.cos(a)*r, Math.sin(a)*r) : ctx.lineTo(Math.cos(a)*r, Math.sin(a)*r);
+      }
+      ctx.closePath();
+      break;
+
+    case 'heart': {
+      // Srdce pomocí bézierových křivek
+      const s = r * 0.75;
+      ctx.moveTo(0, s);
+      ctx.bezierCurveTo(-s*2, -s*0.3, -s*2.2, -s*1.8, 0, -s*0.8);
+      ctx.bezierCurveTo( s*2.2, -s*1.8,  s*2,  -s*0.3, 0, s);
+      ctx.closePath();
+      break;
+    }
+
+    case 'gear': {
+      const teeth = 8;
+      for (let i = 0; i < teeth * 2; i++) {
+        const a = (Math.PI / teeth) * i;
+        const rr = i % 2 === 0 ? r : r * 0.78;
+        i === 0 ? ctx.moveTo(Math.cos(a)*rr, Math.sin(a)*rr) : ctx.lineTo(Math.cos(a)*rr, Math.sin(a)*rr);
+      }
+      ctx.closePath();
+      break;
+    }
+
+    case 'none':
+      // Žádný tvar — jen tečka pro orientaci
+      ctx.arc(0, 0, r * 0.25, 0, Math.PI * 2);
+      break;
+
+    case 'square': {
+      const s = r * 0.85;
+      ctx.rect(-s, -s, s*2, s*2);
+      break;
+    }
+
+    case 'rsquare':
+    default: {
+      const s = r * 0.85;
+      const cr = s * 0.2;
+      ctx.moveTo(-s+cr, -s);
+      ctx.lineTo(s-cr, -s); ctx.arcTo(s, -s, s, -s+cr, cr);
+      ctx.lineTo(s, s-cr);  ctx.arcTo(s, s, s-cr, s, cr);
+      ctx.lineTo(-s+cr, s); ctx.arcTo(-s, s, -s, s-cr, cr);
+      ctx.lineTo(-s, -s+cr);ctx.arcTo(-s, -s, -s+cr, -s, cr);
+      ctx.closePath();
+      break;
+    }
+  }
+  ctx.fillStyle = fill;
+  ctx.fill();
+  if (shape !== 'none') {
+    ctx.strokeStyle = stroke;
+    ctx.lineWidth = lineW;
+    ctx.stroke();
+  }
+}
+
+let drawPending = false;
+function requestDraw() {
+  if (!drawPending) {
+    drawPending = true;
+    requestAnimationFrame(() => { draw(); drawPending = false; });
+  }
+}
+
+// Nakreslí linku se šipkou na konci
+function drawArrow(ctx, x1, y1, x2, y2, color) {
+  const dx = x2 - x1, dy = y2 - y1;
+  const len = Math.sqrt(dx*dx + dy*dy);
+  if (len < 4) return;
+  const ux = dx/len, uy = dy/len;
+  const arrowLen = Math.min(10, len * 0.3);
+  const arrowW = 4;
+  // Zkrať linku o poloměr cílového uzlu (cca 6px) aby nevlézala do tvaru
+  const endX = x2 - ux * 6, endY = y2 - uy * 6;
+
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(endX, endY);
+  ctx.stroke();
+
+  // Šipka
+  ctx.beginPath();
+  ctx.moveTo(endX, endY);
+  ctx.lineTo(endX - ux*arrowLen + uy*arrowW, endY - uy*arrowLen - ux*arrowW);
+  ctx.lineTo(endX - ux*arrowLen - uy*arrowW, endY - uy*arrowLen + ux*arrowW);
+  ctx.closePath();
+  ctx.fillStyle = color;
+  ctx.fill();
+}
+
+// ─── MOUSE / TOUCH INTERACTION ────────────────────────────────────────────────
+function getQuestAtScreen(sx, sy) {
+  if (!activeChapter) return null;
+  const r = vpScale * 0.38;
+  for (let i = activeChapter.quests.length - 1; i >= 0; i--) {
+    const q = activeChapter.quests[i];
+    if (q.invisible) continue;
+    const [qx, qy] = worldToScreen(q.x, q.y);
+    const qr = r * (q.size || 1.0) * 1.1;
+    const dx = sx - qx, dy = sy - qy;
+    if (dx * dx + dy * dy < qr * qr) return q;
+  }
+  return null;
+}
+
+canvas.addEventListener('mousedown', e => {
+  const q = getQuestAtScreen(e.offsetX, e.offsetY);
+  if (q) {
+    selectQuest(q, e.offsetX, e.offsetY);
+    return;
+  }
+  isDragging = true;
+  dragStartX = e.clientX; dragStartY = e.clientY;
+  vpXStart = vpX; vpYStart = vpY;
+  canvas.classList.add('grabbing');
+});
+
+canvas.addEventListener('mousemove', e => {
+  if (isDragging) {
+    vpX = vpXStart + (e.clientX - dragStartX);
+    vpY = vpYStart + (e.clientY - dragStartY);
+    requestDraw();
+    return;
+  }
+  const q = getQuestAtScreen(e.offsetX, e.offsetY);
+  const newId = q ? q.id : null;
+  if (newId !== hoveredQuestId) {
+    hoveredQuestId = newId;
+    canvas.classList.toggle('hovering', !!newId);
+    requestDraw();
+  }
+  if (q) {
+    showTooltip(e.clientX, e.clientY, q);
+  } else {
+    hideTooltip();
+  }
+});
+
+canvas.addEventListener('mouseup', () => { isDragging = false; canvas.classList.remove('grabbing'); });
+canvas.addEventListener('mouseleave', () => { isDragging = false; canvas.classList.remove('grabbing'); hideTooltip(); });
+
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  const factor = e.deltaY < 0 ? 1.12 : 0.89;
+  const mx = e.offsetX, my = e.offsetY;
+  const [wx, wy] = screenToWorld(mx, my);
+  vpScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, vpScale * factor));
+  vpX = mx - wx * vpScale;
+  vpY = my - wy * vpScale;
+  requestDraw();
+}, { passive: false });
+
+// Touch
+let lastTouchDist = 0, lastTouchMidX = 0, lastTouchMidY = 0;
+canvas.addEventListener('touchstart', e => {
+  if (e.touches.length === 2) {
+    const t0 = e.touches[0], t1 = e.touches[1];
+    lastTouchDist = Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY);
+    lastTouchMidX = (t0.clientX + t1.clientX) / 2;
+    lastTouchMidY = (t0.clientY + t1.clientY) / 2;
+  } else if (e.touches.length === 1) {
+    isDragging = true;
+    dragStartX = e.touches[0].clientX; dragStartY = e.touches[0].clientY;
+    vpXStart = vpX; vpYStart = vpY;
+  }
+});
+canvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+  if (e.touches.length === 2) {
+    const t0 = e.touches[0], t1 = e.touches[1];
+    const dist = Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY);
+    const midX = (t0.clientX + t1.clientX) / 2;
+    const midY = (t0.clientY + t1.clientY) / 2;
+    const rect = canvas.getBoundingClientRect();
+    const [wx, wy] = screenToWorld(midX - rect.left, midY - rect.top);
+    vpScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, vpScale * (dist / lastTouchDist)));
+    vpX = (midX - rect.left) - wx * vpScale;
+    vpY = (midY - rect.top) - wy * vpScale;
+    lastTouchDist = dist;
+    requestDraw();
+  } else if (e.touches.length === 1 && isDragging) {
+    vpX = vpXStart + (e.touches[0].clientX - dragStartX);
+    vpY = vpYStart + (e.touches[0].clientY - dragStartY);
+    requestDraw();
+  }
+}, { passive: false });
+canvas.addEventListener('touchend', e => {
+  if (e.touches.length === 0) {
+    if (!isDragging) return;
+    isDragging = false;
+    // tap: find quest
+    const touch = e.changedTouches[0];
+    const rect = canvas.getBoundingClientRect();
+    const sx = touch.clientX - rect.left;
+    const sy = touch.clientY - rect.top;
+    const q = getQuestAtScreen(sx, sy);
+    if (q) selectQuest(q, sx, sy);
+  }
+});
+
+// ─── ZOOM CONTROLS ────────────────────────────────────────────────────────────
+document.getElementById('btnZoomIn').onclick = () => {
+  const cx = canvas.width / 2, cy = canvas.height / 2;
+  const [wx, wy] = screenToWorld(cx, cy);
+  vpScale = Math.min(MAX_SCALE, vpScale * 1.25);
+  vpX = cx - wx * vpScale; vpY = cy - wy * vpScale;
+  requestDraw();
+};
+document.getElementById('btnZoomOut').onclick = () => {
+  const cx = canvas.width / 2, cy = canvas.height / 2;
+  const [wx, wy] = screenToWorld(cx, cy);
+  vpScale = Math.max(MIN_SCALE, vpScale * 0.8);
+  vpX = cx - wx * vpScale; vpY = cy - wy * vpScale;
+  requestDraw();
+};
+document.getElementById('btnFit').onclick = () => { fitChapter(); requestDraw(); };
+
+// Deps toggle: hover → all → none → hover
+const DEP_MODES = ['hover', 'all', 'none'];
+const DEP_LABELS = { hover: 'DEP', all: 'DEP●', none: 'DEP○' };
+const DEP_TITLES = { hover: 'Deps: on hover only', all: 'Deps: always visible', none: 'Deps: hidden' };
+const btnDeps = document.getElementById('btnDeps');
+btnDeps.onclick = () => {
+  const idx = DEP_MODES.indexOf(depsMode);
+  depsMode = DEP_MODES[(idx + 1) % DEP_MODES.length];
+  btnDeps.textContent = DEP_LABELS[depsMode];
+  btnDeps.title = DEP_TITLES[depsMode];
+  btnDeps.style.color = depsMode === 'all' ? 'var(--gold)' : depsMode === 'none' ? 'var(--text-dim)' : '';
+  requestDraw();
+};
+
+// Sidebar toggle (mobile)
+const sidebar = document.getElementById('sidebar');
+const sidebarBackdrop = document.getElementById('sidebarBackdrop');
+document.getElementById('sidebarToggle').onclick = () => {
+  sidebar.classList.add('mobile-open');
+  sidebarBackdrop.classList.add('open');
+};
+sidebarBackdrop.onclick = () => {
+  sidebar.classList.remove('mobile-open');
+  sidebarBackdrop.classList.remove('open');
+};
+
+// ─── QUEST POPUP ──────────────────────────────────────────────────────────────
+const popup        = document.getElementById('questPopup');
+const popupBackdrop = document.getElementById('popupBackdrop');
+
+function selectQuest(q, screenX, screenY) {
+  selectedQuestId = q.id;
+  requestDraw();
+  openPopup(q, screenX, screenY);
+}
+
+function openPopup(q, screenX, screenY) {
+  const header = document.getElementById('popupHeader');
+  const body   = document.getElementById('popupBody');
+
+  // Header
+  header.innerHTML = `
+    <button class="popup-close" id="popupClose" onclick="closePopup()">✕</button>
+    <div class="popup-title">${mcToHtml(q.title)}</div>
+    ${q.subtitle ? `<div class="popup-subtitle">${mcToHtml(q.subtitle)}</div>` : ''}
+  `;
+
+  // Body
+  let html = '';
+
+  if (q.desc && q.desc.length > 0) {
+    const combined = q.desc.join('\n');
+    html += `<div class="section-label">Description</div>`;
+    html += `<div class="quest-desc">${mcToHtml(combined).replace(/\n/g, '<br>')}</div>`;
+  } else {
+    html += `<div class="no-desc">No description available.</div>`;
+  }
+
+  if (q.tasks && q.tasks.length > 0) {
+    html += `<div class="popup-divider"></div><div class="section-label">Tasks</div><div class="task-list">`;
+    for (const t of q.tasks) {
+      const emoji = taskIcon(t.type);
+      let name = '', iconHtml = '';
+      if (t.item) {
+        name = t.item.split(':').pop().replace(/_/g, ' ');
+        iconHtml = itemIcon(t.item, emoji);
+      } else if (t.entity) {
+        name = 'Kill: ' + t.entity.split(':').pop().replace(/_/g, ' ');
+        iconHtml = itemIcon(t.entity, emoji);
+      } else if (t.advancement) {
+        name = t.advancement.split('/').pop().replace(/_/g, ' ');
+        iconHtml = `<span>${emoji}</span>`;
+      } else if (t.biome) {
+        name = t.biome.split(':').pop().replace(/_/g, ' ');
+        iconHtml = `<span>${emoji}</span>`;
+      } else if (t.dimension) {
+        name = t.dimension.split(':').pop().replace(/_/g, ' ');
+        iconHtml = `<span>${emoji}</span>`;
+      } else if (t.structure) {
+        name = t.structure.split(':').pop().replace(/_/g, ' ');
+        iconHtml = `<span>${emoji}</span>`;
+      } else {
+        name = t.type; iconHtml = `<span>${emoji}</span>`;
+      }
+      const cnt = t.count && t.count > 1 ? `<span class="t-count">×${t.count}</span>` : '';
+      html += `<div class="task-item">${iconHtml}<span class="t-name">${escHtml(name)}</span>${cnt}</div>`;
+    }
+    html += `</div>`;
+  }
+
+  body.innerHTML = html;
+
+  // Pozicování — otevři blízko kliknutého questu, ale ne mimo obrazovku
+  popup.style.display = 'flex';  // musí být viditelný pro měření
+  popup.classList.add('open');
+  popupBackdrop.classList.add('open');
+
+  const area  = document.getElementById('mapArea');
+  const areaW = area.clientWidth;
+  const areaH = area.clientHeight;
+  const popW  = popup.offsetWidth;
+  const popH  = popup.offsetHeight;
+  const margin = 16;
+  const offset = 24;  // offset od kliknutého bodu
+
+  let left = (screenX || areaW / 2) + offset;
+  let top  = (screenY || areaH / 2) - popH / 2;
+
+  // Nepřetékej přes pravý okraj
+  if (left + popW + margin > areaW) left = (screenX || areaW/2) - popW - offset;
+  // Nepřetékej přes spodní/horní okraj
+  top = Math.max(margin, Math.min(top, areaH - popH - margin));
+  left = Math.max(margin, left);
+
+  popup.style.left = left + 'px';
+  popup.style.top  = top  + 'px';
+}
+
+function closePopup() {
+  popup.classList.remove('open');
+  popup.style.display = 'none';
+  popupBackdrop.classList.remove('open');
+  selectedQuestId = null;
+  requestDraw();
+}
+
+popupBackdrop.addEventListener('click', closePopup);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closePopup(); });
+
+function taskIcon(type) {
+  const map = {
+    item: '📦', kill: '⚔️', checkmark: '✅', advancement: '🏆',
+    biome: '🌍', dimension: '🌐', structure: '🏛️', observation: '👁️',
+    blood: '🩸', fluid: '💧', energy: '⚡',
+  };
+  return map[type] || '📌';
+}
+
+// ─── TOOLTIP ──────────────────────────────────────────────────────────────────
+const tooltip = document.getElementById('tooltip');
+function showTooltip(mx, my, q) {
+  tooltip.innerHTML = `<div class="tt-title">${escHtml(stripMc(q.title))}</div>${q.subtitle ? `<div class="tt-sub">${escHtml(stripMc(q.subtitle))}</div>` : ''}`;
+  tooltip.style.display = 'block';
+  const tw = tooltip.offsetWidth, th = tooltip.offsetHeight;
+  tooltip.style.left = (mx + 14 + tw > window.innerWidth ? mx - tw - 8 : mx + 14) + 'px';
+  tooltip.style.top = (my + 20 + th > window.innerHeight ? my - th - 6 : my + 10) + 'px';
+}
+function hideTooltip() { tooltip.style.display = 'none'; }
+
+// ─── SEARCH ───────────────────────────────────────────────────────────────────
+let searchTimer;
+document.getElementById('searchInput').addEventListener('input', e => {
+  clearTimeout(searchTimer);
+  const q = e.target.value.trim();
+  if (!q) { hideSearch(); return; }
+  searchTimer = setTimeout(() => runSearch(q), 180);
+});
+document.getElementById('searchInput').addEventListener('keydown', e => {
+  if (e.key === 'Escape') { hideSearch(); e.target.blur(); }
+});
+
+function runSearch(query) {
+  if (!DATA) return;
+  const ql = query.toLowerCase();
+  const overlay = document.getElementById('searchOverlay');
+  overlay.classList.add('visible');
+
+  const results = [];
+  for (const ch of DATA.chapters) {
+    const chMatches = [];
+    for (const q of ch.quests) {
+      const titleMatch = q.title_plain.toLowerCase().includes(ql);
+      const descMatch = q.desc && q.desc.some(d => stripMc(d).toLowerCase().includes(ql));
+      if (titleMatch || descMatch) {
+        chMatches.push({ q, titleMatch, descMatch });
+      }
+    }
+    if (chMatches.length) results.push({ ch, matches: chMatches });
+  }
+
+  if (!results.length) {
+    overlay.innerHTML = `<div class="search-results-title">Search: "${escHtml(query)}"</div><div class="no-results">No quests found.</div>`;
+    return;
+  }
+
+  let html = `<div class="search-results-title">Found in ${results.reduce((s,r) => s+r.matches.length,0)} quests across ${results.length} chapters</div>`;
+  for (const { ch, matches } of results.slice(0, 20)) {
+    html += `<div class="search-group-title">${escHtml(stripMc(ch.title))}</div>`;
+    for (const { q, descMatch } of matches.slice(0, 8)) {
+      const titleHl = highlight(q.title_plain, ql);
+      let descSnippet = '';
+      if (descMatch && q.desc) {
+        const line = q.desc.find(d => stripMc(d).toLowerCase().includes(ql));
+        if (line) descSnippet = highlight(stripMc(line).slice(0, 80) + (line.length > 80 ? '…' : ''), ql);
+      }
+      html += `<div class="search-result-item" onclick="jumpToQuest('${ch.id}','${q.id}')">
+        <div class="sri-title">${titleHl}</div>
+        ${descSnippet ? `<div class="sri-desc">${descSnippet}</div>` : ''}
+      </div>`;
+    }
+    if (matches.length > 8) html += `<div class="sri-desc" style="padding:4px 12px;opacity:0.5">…and ${matches.length - 8} more</div>`;
+  }
+  overlay.innerHTML = html;
+}
+
+function highlight(text, query) {
+  const idx = text.toLowerCase().indexOf(query.toLowerCase());
+  if (idx === -1) return escHtml(text);
+  return escHtml(text.slice(0, idx)) + '<mark>' + escHtml(text.slice(idx, idx + query.length)) + '</mark>' + escHtml(text.slice(idx + query.length));
+}
+
+function hideSearch() {
+  document.getElementById('searchOverlay').classList.remove('visible');
+  document.getElementById('searchInput').value = '';
+}
+
+function jumpToQuest(chapterId, questId) {
+  hideSearch();
+  selectChapter(chapterId);
+  setTimeout(() => {
+    const q = activeChapter?.quests.find(q => q.id === questId);
+    if (!q) return;
+    // Centruj na quest
+    const cx = canvas.width / 2, cy = canvas.height / 2;
+    vpX = cx - q.x * vpScale;
+    vpY = cy - q.y * vpScale;
+    selectedQuestId = questId;
+    requestDraw();
+    openPopup(q, cx + vpScale * 2, cy);
+  }, 50);
+}
+
+// ─── RESIZE ───────────────────────────────────────────────────────────────────
+const ro = new ResizeObserver(() => {
+  resizeCanvas();
+  requestDraw();
+});
+ro.observe(document.getElementById('mapArea'));
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+resizeCanvas();
+loadData();
+</script>
+</body>
+</html>

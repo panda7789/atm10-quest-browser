@@ -1,0 +1,10 @@
+{
+  "name": "atm10-quest-browser",
+  "version": "1.0.0",
+  "scripts": {
+    "start": "serve ."
+  },
+  "dependencies": {
+    "serve": "^14.2.4"
+  }
+}
