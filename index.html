@@ -8,10 +8,10 @@
 <style>
 /* ─── VARIABLES ─────────────────────────────────────────────────────── */
 :root {
-  --bg:        #0c0e14;
-  --bg2:       #12151e;
-  --bg3:       #191d28;
-  --bg4:       #1f2433;
+  --bg:        #161920;
+  --bg2:       #1c2030;
+  --bg3:       #232840;
+  --bg4:       #2a3050;
   --border:    #262d3f;
   --border2:   #313b52;
   --gold:      #d4a843;
@@ -651,21 +651,31 @@ async function loadIcons() {
       ATLAS_META = await res.json();
       ICON_MODE = 'atlas';
       console.log(`Icons: atlas mode (${Object.keys(ATLAS_META.icons).length} ikon)`);
-      return;
     }
   } catch {}
 
-  // Fallback: individuální soubory
+  // Fallback / doplněk: individuální soubory
   try {
     const res = await fetch('icons_manifest.json');
     if (res.ok) {
       FILES_MAP = await res.json();
-      ICON_MODE = 'files';
-      console.log(`Icons: files mode (${Object.keys(FILES_MAP).length} ikon)`);
-      return;
+      if (!ICON_MODE) ICON_MODE = 'files';
+      console.log(`Icons: files manifest (${Object.keys(FILES_MAP).length} klíčů)`);
     }
   } catch {}
-  // Bez ikon — nevadí
+
+  // Chapter images manifest
+  try {
+    let res = await fetch('chapter_images_manifest.json');
+    if (!res.ok) res = await fetch('icons_manifest.json');
+    if (res.ok && !FILES_MAP) FILES_MAP = await res.json();
+    else if (res.ok) Object.assign(FILES_MAP, await res.json());
+  } catch {}
+
+  // Vyčisti cache — mohly se nacachovat 'missing'/'error' před načtením manifestu
+  iconCache.clear();
+  imageCache.clear();
+  console.log('ICON_MODE:', ICON_MODE, '| atlas icons:', ATLAS_META ? Object.keys(ATLAS_META.icons).length : 'none', '| files keys:', FILES_MAP ? Object.keys(FILES_MAP).length : 'none');
 }
 
 function itemIcon(itemId, fallbackEmoji) {
@@ -688,7 +698,7 @@ function itemIcon(itemId, fallbackEmoji) {
     }
   }
 
-  if (ICON_MODE === 'files') {
+  if (FILES_MAP) {
     const url = FILES_MAP[itemId] || FILES_MAP[`${itemId}_item`] || null;
     if (url) {
       return `<img src="${escHtml(url)}" alt="${escHtml(itemId)}" title="${escHtml(itemId)}" style="width:${TILE}px;height:${TILE}px;image-rendering:pixelated;vertical-align:middle;flex-shrink:0;" onerror="this.replaceWith(document.createTextNode('${fallbackEmoji}'))">`;
@@ -698,7 +708,253 @@ function itemIcon(itemId, fallbackEmoji) {
   return `<span title="${escHtml(itemId)}">${fallbackEmoji}</span>`;
 }
 
-// ─── LOAD DATA ────────────────────────────────────────────────────────────────
+// ─── CANVAS ICON CACHE ────────────────────────────────────────────────────────
+// Předloadované Image objekty pro kreslení na canvas
+const iconCache = new Map();  // itemId → HTMLImageElement | 'loading' | 'error'
+
+function lookupIconId(itemId) {
+  const colon = itemId.indexOf(':');
+  if (colon === -1) return [itemId];
+  const ns   = itemId.slice(0, colon);
+  const name = itemId.slice(colon + 1);
+  return [
+    itemId,
+    `${ns}:${name}_item`,
+    `${ns}:${name}_block`,
+  ];
+}
+
+// Vrátí true pokud URL textury pochází z textures/block/ → renderovat jako 3D kostku
+function isBlockTexture(itemId) {
+  if (!FILES_MAP) return false;
+  const variants = lookupIconId(itemId);
+  for (const v of variants) {
+    const url = FILES_MAP[v];
+    if (url) return url.includes('/block/');
+  }
+  return false;
+}
+
+// Nakreslí izometrickou 3D kostku z jedné textury. Střed na (0,0).
+function drawIsoCube(ctx, img, size) {
+  const w = size;        // polovina šířky
+  const h = size * 0.5; // výška top plochy
+  const d = size;        // výška bočních stran
+
+  // 6 viditelných rohů kostky ve screen space
+  const top  = [0,      -(h + d)];
+  const lt   = [-w,     -d      ];
+  const rt   = [ w,     -d      ];
+  const mid  = [0,      -(d - h)]; // střed kde se setkávají 3 plochy = (0, h-d)
+  const lb   = [-w,      h      ];
+  const rb   = [ w,      h      ];
+  const bot  = [0,       d - h  ];
+
+  // Mapuj texturu na parallelogram pomocí affine transformu
+  // p0=TL, p1=TR, p2=BR, p3=BL (po směru hodinových ručiček)
+  function drawFace(p0, p1, p2, p3, brightness) {
+    const T = img.naturalWidth || 16;
+    // Affine: mapuj (0,0)→p0, (T,0)→p1, (0,T)→p3
+    const ax = (p1[0] - p0[0]) / T;
+    const ay = (p1[1] - p0[1]) / T;
+    const bx = (p3[0] - p0[0]) / T;
+    const by = (p3[1] - p0[1]) / T;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(p0[0], p0[1]); ctx.lineTo(p1[0], p1[1]);
+    ctx.lineTo(p2[0], p2[1]); ctx.lineTo(p3[0], p3[1]);
+    ctx.closePath();
+    ctx.clip();
+    ctx.transform(ax, ay, bx, by, p0[0], p0[1]);
+    ctx.drawImage(img, 0, 0, T, T);
+    // Ztmavení přes poloprůhledný overlay
+    if (brightness < 1) {
+      ctx.fillStyle = `rgba(0,0,0,${(1 - brightness).toFixed(2)})`;
+      ctx.fillRect(0, 0, T, T);
+    }
+    ctx.restore();
+  }
+
+  // Střed kostky = průměr všech viditelných bodů → vycentruj
+  const cy = (top[1] + lb[1]) / 2;
+
+  ctx.save();
+  ctx.translate(0, -cy);
+
+  // TOP face:   lt → top → rt → mid   (nejsvětlejší)
+  drawFace(lt, top, rt, mid, 1.0);
+  // LEFT face:  lt → mid → bot → lb   (střední)
+  drawFace(lt, mid, bot, lb, 0.65);
+  // RIGHT face: mid → rt → rb → bot   (nejtmavší)
+  drawFace(mid, rt, rb, bot, 0.80);
+
+  ctx.restore();
+}
+
+function getCanvasIcon(itemId) {
+  if (!itemId || !ICON_MODE) return null;
+  if (iconCache.has(itemId)) {
+    const v = iconCache.get(itemId);
+    return (v instanceof HTMLImageElement && v.complete && v.naturalWidth > 0) ? v : null;
+  }
+
+  let url = null;
+
+  if (ICON_MODE === 'atlas') {
+    const variants = lookupIconId(itemId);
+    let entry = null;
+    for (const v of variants) {
+      entry = ATLAS_META.icons[v];
+      if (entry) break;
+    }
+    if (entry) {
+      if (!getCanvasIcon._atlasImg) {
+        const img = new Image();
+        img.src = 'icons_atlas.webp';
+        img.onerror = () => { img.src = 'icons_atlas.png'; };
+        getCanvasIcon._atlasImg = img;
+      }
+      const atlasImg = getCanvasIcon._atlasImg;
+      if (!atlasImg.complete || atlasImg.naturalWidth === 0) {
+        if (!getCanvasIcon._atlasListening) {
+          getCanvasIcon._atlasListening = true;
+          atlasImg.addEventListener('load', () => { iconCache.clear(); requestDraw(); });
+        }
+        iconCache.set(itemId, 'loading');
+        return null;
+      }
+      const TILE = ATLAS_META.tile;
+      const oc = document.createElement('canvas');
+      oc.width = oc.height = TILE;
+      oc.getContext('2d').drawImage(atlasImg, entry.x, entry.y, TILE, TILE, 0, 0, TILE, TILE);
+      const img = new Image();
+      img.src = oc.toDataURL();
+      iconCache.set(itemId, img);
+      return img.complete ? img : null;
+    }
+    // Není v atlasu — padni přes na FILES_MAP
+  }
+
+  if (FILES_MAP) {
+    const variants = lookupIconId(itemId);
+    for (const v of variants) {
+      if (FILES_MAP[v]) { url = FILES_MAP[v]; break; }
+    }
+    if (!url) { iconCache.set(itemId, 'error'); return null; }
+    const img = new Image();
+    iconCache.set(itemId, img);
+    img.onload = () => requestDraw();
+    img.onerror = () => iconCache.set(itemId, 'error');
+    img.src = url;
+    if (img.complete && img.naturalWidth > 0) return img;
+    return null;
+  }
+
+  return null;
+}
+
+// ─── ANIMACE ──────────────────────────────────────────────────────────────────
+// Globální čas pro animace (sekundy) — aktualizuje se v draw loop
+let animTime = 0;
+let lastFrameTime = performance.now();
+
+function getAnimFrame(items, intervalMs = 1000) {
+  if (!items || items.length === 0) return null;
+  const idx = Math.floor(animTime * 1000 / intervalMs) % items.length;
+  return items[idx];
+}
+
+// Vrátí item ID k zobrazení pro daný quest (s podporou animace smart_filter)
+// Animační frame — střídá se každou vteřinu
+let animFrame = 0;
+setInterval(() => { animFrame++; requestDraw(); }, 1000);
+function getAnimFrame(items) {
+  return items[animFrame % items.length];
+}
+
+function getQuestIconId(q) {
+  if (q.icon) return { id: q.icon };
+  const tasks = q.tasks;
+  if (!tasks || tasks.length === 0) return null;
+  const first = tasks[0];
+  if (first.item === 'ftbfiltersystem:smart_filter' && first.filter_items?.length) {
+    return { id: getAnimFrame(first.filter_items) };
+  }
+  return { id: first.item || first.entity || null };
+}
+
+function drawQuestIcon(ctx, q, size) {
+  const info = getQuestIconId(q);
+  if (!info || !info.id) return false;
+  const img = getCanvasIcon(info.id);
+  if (!img) return false;
+
+  ctx.save();
+  ctx.imageSmoothingEnabled = false;
+  if (isBlockTexture(info.id)) {
+    drawIsoCube(ctx, img, size * 0.72);
+  } else {
+    const half = size / 2;
+    ctx.drawImage(img, -half, -half, size, size);
+  }
+  ctx.restore();
+  return true;
+}
+
+
+
+// ─── CHAPTER IMAGES ───────────────────────────────────────────────────────────
+function resolveImageUrl(imageRef) {
+  if (!imageRef || !FILES_MAP) return null;
+  const colon = imageRef.indexOf(':');
+  if (colon === -1) return null;
+  const ns      = imageRef.slice(0, colon);
+  const imgPath = imageRef.slice(colon + 1);
+
+  // Zkus klíče v pořadí priority
+  const basename = imgPath.split('/').pop().replace(/\.png$/, '');
+  return FILES_MAP[imageRef]           // přesný klíč: "atm:textures/questpics/ae2.png"
+      || FILES_MAP[`${ns}:${basename}`] // basename: "atm:ae2"
+      || null;
+}
+
+const imageCache = new Map();
+
+function getChapterImage(imageRef) {
+  if (imageCache.has(imageRef)) {
+    const v = imageCache.get(imageRef);
+    return (v instanceof HTMLImageElement && v.complete && v.naturalWidth > 0) ? v : null;
+  }
+  if (!FILES_MAP) return null;  // ještě se načítá — nezacachuj nic
+  const url = resolveImageUrl(imageRef);
+  if (!url) { imageCache.set(imageRef, 'missing'); return null; }
+  const img = new Image();
+  img.src = url;
+  img.onload = () => requestDraw();
+  imageCache.set(imageRef, img);
+  return null;
+}
+
+function drawChapterImages(ctx, chapter) {
+  if (!chapter.images || !chapter.images.length) return;
+  for (const imgDef of chapter.images) {
+    const img = getChapterImage(imgDef.image);
+    if (!img) continue;
+    const [sx, sy] = worldToScreen(imgDef.x, imgDef.y);
+    const sw = imgDef.w * vpScale;
+    const sh = imgDef.h * vpScale;
+    ctx.save();
+    ctx.translate(sx, sy);
+    if (imgDef.rotation) ctx.rotate(imgDef.rotation * Math.PI / 180);
+    ctx.globalAlpha = 0.9;
+    ctx.imageSmoothingEnabled = true;
+    // x,y je střed obrázku (stejně jako FTB Quests)
+    ctx.drawImage(img, -sw / 2, -sh / 2, sw, sh);
+    ctx.restore();
+  }
+}
+
 async function loadData() {
   try {
     const [questRes] = await Promise.all([
@@ -764,6 +1020,15 @@ function selectChapter(id) {
   requestDraw();
   hideSearch();
 
+  // DEBUG — odstraň po ověření
+  console.log('Chapter images:', activeChapter.images?.length, activeChapter.images?.[0]);
+  if (activeChapter.images?.length) {
+    const ref = activeChapter.images[0].image;
+    console.log('resolveImageUrl:', resolveImageUrl(ref));
+    console.log('FILES_MAP key exists:', FILES_MAP ? (ref in FILES_MAP) : 'FILES_MAP null');
+    console.log('imageCache has:', imageCache.has(ref), imageCache.get(ref));
+  }
+
   // Zavři sidebar na mobilu
   document.getElementById('sidebar').classList.remove('mobile-open');
   document.getElementById('sidebarBackdrop').classList.remove('open');
@@ -821,11 +1086,27 @@ function draw() {
   const W = canvas.width, H = canvas.height;
   ctx.clearRect(0, 0, W, H);
 
+  // Aktualizuj čas animace
+  const now = performance.now();
+  animTime += (now - lastFrameTime) / 1000;
+  lastFrameTime = now;
+
   if (!activeChapter) return;
 
   const quests = activeChapter.quests;
   const questById = {};
   for (const q of quests) questById[q.id] = q;
+
+  // Zkontroluj jestli jsou v kapitole animované questy — pokud ano, naplánuj další frame
+  const hasAnimated = quests.some(q =>
+    q.tasks?.some(t => t.item === 'ftbfiltersystem:smart_filter' && t.filter_items?.length > 1)
+  );
+  if (hasAnimated) {
+    setTimeout(() => requestDraw(), 1000);
+  }
+
+  // ── Dekorativní obrázky (za questy) ─────────────────
+  drawChapterImages(ctx, activeChapter);
 
   // ── Draw dependency lines ─────────────────────────────
   const selectedQ = selectedQuestId ? questById[selectedQuestId] : null;
@@ -935,7 +1216,13 @@ function draw() {
     // Draw shape
     drawShape(ctx, q.shape || 'rsquare', qr, fillColor, strokeColor, isSelected ? 2 : 1);
 
-    // Label (only if large enough)
+    // Ikona (pokud je dost velká)
+    if (qr >= 10) {
+      const iconSize = qr * 1.3;
+      drawQuestIcon(ctx, q, iconSize);
+    }
+
+    // Label (only if large enough a není ikona)
     if (vpScale >= 35 && q.title_plain) {
       const label = q.title_plain.length > 18 ? q.title_plain.slice(0, 16) + '…' : q.title_plain;
       ctx.font = `${font}px "Source Serif 4", serif`;

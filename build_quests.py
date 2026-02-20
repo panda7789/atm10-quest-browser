@@ -117,15 +117,32 @@ def parse_task(block):
     task = {'type': task_type}
 
     if task_type == 'item':
-        # item může být string nebo nested block
-        item_m = re.search(r'\bitem\s*:\s*\{([^}]+)\}', block)
+        # item může být string nebo nested block { id: ..., components: { ... } }
+        item_m = re.search(r'\bitem\s*:\s*\{', block)
         if item_m:
-            item_block = item_m.group(1)
+            # Najdi celý nested blok včetně vnořených {}
+            start = item_m.end() - 1
+            depth, end = 0, start
+            for i in range(start, len(block)):
+                if block[i] == '{': depth += 1
+                elif block[i] == '}':
+                    depth -= 1
+                    if depth == 0: end = i; break
+            item_block = block[start+1:end]
+
             item_id = get_field_str(item_block, 'id')
             count = get_field_num(item_block, 'count')
             task['item'] = item_id or ''
             if count and count > 1:
                 task['count'] = int(count)
+            # Smart filter — parsuj items ze filter stringu
+            if item_id == 'ftbfiltersystem:smart_filter':
+                filter_m = re.search(r'"ftbfiltersystem:filter"\s*:\s*"([^"]+)"', item_block)
+                if filter_m:
+                    items = re.findall(r'\bitem\(([^)]+)\)', filter_m.group(1))
+                    if items:
+                        seen = set()
+                        task['filter_items'] = [x for x in items if not (x in seen or seen.add(x))]
         else:
             item_str = get_field_str(block, 'item')
             if item_str:
@@ -162,6 +179,41 @@ def parse_task(block):
     return task
 
 
+def parse_chapter_images(text):
+    """Parsuje images: [] blok na úrovni kapitoly."""
+    images = []
+    # Najdi images: [ ... ] na depth 1 (1 tab)
+    m = re.search(r'^\timages\s*:\s*\[', text, re.MULTILINE)
+    if not m:
+        return images
+    start = m.end() - 1
+    depth = 0
+    end = start
+    for i in range(start, len(text)):
+        if text[i] == '[': depth += 1
+        elif text[i] == ']':
+            depth -= 1
+            if depth == 0: end = i; break
+
+    content = text[start+1:end]
+    for block in extract_blocks(content):
+        img_ref = get_field_str(block, 'image')
+        x       = get_field_num(block, 'x')
+        y       = get_field_num(block, 'y')
+        w       = get_field_num(block, 'width')
+        h       = get_field_num(block, 'height')
+        rot     = get_field_num(block, 'rotation')
+        if img_ref and x is not None and y is not None:
+            images.append({
+                'image': img_ref,
+                'x': x, 'y': y,
+                'w': w or 1.0,
+                'h': h or 1.0,
+                'rotation': rot or 0.0,
+            })
+    return images
+
+
 def parse_chapter_file(filepath):
     """Parsuje jeden .snbt chapter soubor. Vrátí dict s chapter metadaty a questy."""
     with open(filepath, encoding='utf-8') as f:
@@ -194,6 +246,9 @@ def parse_chapter_file(filepath):
     # Icon (jen string form)
     icon_m = re.search(r'^\bicon\s*:\s*"([^"]+)"', text, re.MULTILINE)
     chapter['icon'] = icon_m.group(1) if icon_m else ''
+
+    # Dekorativní obrázky na mapě
+    chapter['images'] = parse_chapter_images(text)
 
     # Parsuj questy — najdi sekci quests: [...]
     quests_m = re.search(r'\bquests\s*:\s*\[', text)
@@ -256,6 +311,15 @@ def parse_quest_block(block, default_shape):
     # Invisible
     if re.search(r'\binvisible\s*:\s*true\b', block):
         quest['invisible'] = True
+
+    # Icon — může být string nebo blok { id: "..." }
+    icon_str = re.search(r'^\s*icon\s*:\s*"([^"]+)"', block, re.MULTILINE)
+    if icon_str:
+        quest['icon'] = icon_str.group(1)
+    else:
+        icon_block = re.search(r'^\s*icon\s*:\s*\{[^}]*\bid\s*:\s*"([^"]+)"', block, re.MULTILINE | re.DOTALL)
+        if icon_block:
+            quest['icon'] = icon_block.group(1)
 
     # Tasks
     task_blocks = get_list_of_blocks(block, 'tasks')

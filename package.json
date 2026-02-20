@@ -2,9 +2,12 @@
   "name": "atm10-quest-browser",
   "version": "1.0.0",
   "scripts": {
-    "start": "serve ."
+    "start": "serve .",
+    "icons": "node extract_icons.js",
+    "atlas": "node build_atlas.js"
   },
   "dependencies": {
-    "serve": "^14.2.4"
+    "serve": "^14.2.4",
+    "sharp": "^0.33.4"
   }
 }
