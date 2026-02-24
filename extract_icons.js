@@ -204,9 +204,10 @@ function main() {
 
   // manifest: "namespace:item_name" → relativní URL k PNG
   // Pro každý klíč ukládáme [itemPath, blockPath] — item má prioritu
-  const itemPaths  = {};  // klíč → path z textures/item/
-  const blockPaths = {};  // klíč → path z textures/block/ (fallback)
-  const blockModels = {}; // ns:name → první textura path (z models/block/*.json)
+  const itemPaths  = {};
+  const blockPaths = {};
+  const blockModels = {};
+  const geoModels  = {}; // ns:name → { u, v, size } UV souřadnice hlavy
 
   let totalExtracted = 0;
 
@@ -222,9 +223,9 @@ function main() {
     let count = 0;
 
     for (const entry of entries) {
-      // ── Textury ──────────────────────────────────────────────────────────────
+      // ── Textury item/block ────────────────────────────────────────────────────
       const m = entry.name.match(
-        /^assets\/([^/]+)\/textures\/(items?|blocks?)\/(.+\.png)$/
+        /^(?:common\/src\/main\/resources\/)?assets\/([^/]+)\/textures\/(items?|blocks?)\/(.+\.png)$/
       );
       if (m) {
         const ns       = m[1];
@@ -261,49 +262,92 @@ function main() {
           if (data) {
             try {
               const json = JSON.parse(data.toString('utf8'));
-              // Vezmi první texturu z "textures" objektu
-              const textures = json.textures || {};
-              const firstTex = Object.values(textures).find(v => typeof v === 'string' && !v.startsWith('#'));
-              if (firstTex) blockModels[key] = firstTex; // např. "powah:block/magmator_face_unlit"
+              const tex = json.textures || {};
+              const resolve = (names) => {
+                for (const n of names) {
+                  const v = tex[n];
+                  if (v && typeof v === 'string' && !v.startsWith('#')) return v;
+                }
+                return null;
+              };
+              const top   = resolve(['top', 'top_face', 'up', 'cap', 'end', 'all']);
+              const side  = resolve(['side', 'side_face', 'texture', 'all', 'wall']);
+              const front = resolve(['front', 'face', 'front_face', 'south', 'north', 'side']);
+              const first = top || side || front ||
+                Object.values(tex).find(v => typeof v === 'string' && !v.startsWith('#'));
+              if (first) {
+                blockModels[key] = { top: top||first, side: side||first, front: front||first };
+              }
             } catch {}
           }
+        }
+      }
+
+      // ── Entity textury ────────────────────────────────────────────────────────
+      const me = entry.name.match(
+        /^(?:common\/src\/main\/resources\/)?assets\/([^/]+)\/textures\/entity\/(.+\.png)$/
+      );
+      if (me) {
+        const ns      = me[1];
+        const subpath = me[2];
+        const outFile = path.join(iconsDir, ns, 'entity', subpath);
+        if (!fs.existsSync(outFile)) {
+          const data = extractEntry(buf, entry);
+          if (data) {
+            fs.mkdirSync(path.dirname(outFile), { recursive: true });
+            fs.writeFileSync(outFile, data);
+            totalExtracted++;
+            count++;
+          }
+        }
+        const relUrl   = `icons/${ns}/entity/${subpath}`.replace(/\\/g, '/');
+        const basename = path.basename(subpath, '.png');
+        const flatName = subpath.slice(0, -4).replace(/\//g, '_');
+        // Entity klíče — nepřepisuj existující item/block texturu
+        if (!itemPaths[`${ns}:${basename}`] && !blockPaths[`${ns}:${basename}`]) {
+          blockPaths[`${ns}:${basename}`] = relUrl;
+        }
+        if (flatName !== basename && !itemPaths[`${ns}:${flatName}`] && !blockPaths[`${ns}:${flatName}`]) {
+          blockPaths[`${ns}:${flatName}`] = relUrl;
+        }
+      }
+
+      // ── GeckoLib geo JSONy — UV souřadnice hlavy entity ───────────────────────
+      const mg = entry.name.match(
+        /^(?:common\/src\/main\/resources\/)?assets\/([^/]+)\/geo\/(?:entity\/)?(.+\.json)$/
+      );
+      if (mg && !geoModels[`${mg[1]}:${path.basename(mg[2], '.json')}`]) {
+        const data = extractEntry(buf, entry);
+        if (data) {
+          try {
+            const geo = JSON.parse(data.toString('utf8'));
+            const ns  = mg[1];
+            const name = path.basename(mg[2], '.json');
+            const key  = `${ns}:${name}`;
+            // GeckoLib format: bones[] → cubes[] → uv
+            // Najdi bone "head" nebo první bone s UV
+            const bones = geo?.minecraft?.bones || geo?.bones || [];
+            const headBone = bones.find(b =>
+              /head|skull|face/i.test(b.name)
+            ) || bones[0];
+            if (headBone?.cubes?.length) {
+              const cube = headBone.cubes[0];
+              const uv = cube.uv;
+              if (Array.isArray(uv)) {
+                geoModels[key] = { u: uv[0], v: uv[1], size: cube.size || [8,8,8] };
+              } else if (uv && typeof uv === 'object') {
+                // Format: { north: {uv, uv_size}, ... }
+                const face = uv.north || uv.south || Object.values(uv)[0];
+                if (face?.uv) geoModels[key] = { u: face.uv[0], v: face.uv[1], size: face.uv_size || [8,8] };
+              }
+            }
+          } catch {}
         }
       }
     }
 
     console.log(count > 0 ? `✓ ${count}` : '─');
   }
-
-  // ─── Resolv block modelů → textury pro itemy bez přímé textury ──────────────
-  // Příklad: "powah:magmator_basic" nemá textures/block/magmator_basic.png
-  // ale má models/block/magmator_basic.json → textures.face = "powah:block/magmator_face_unlit"
-  console.log(`\n🔗 Resolvuji block modely (${Object.keys(blockModels).length} modelů)...`);
-  let modelResolved = 0;
-  for (const [key, texRef] of Object.entries(blockModels)) {
-    if (itemPaths[key] || blockPaths[key]) continue; // už má texturu
-
-    // texRef je "ns:block/texname" nebo "ns:texname"
-    const colon = texRef.indexOf(':');
-    if (colon === -1) continue;
-    const texNs   = texRef.slice(0, colon);
-    const texPath = texRef.slice(colon + 1); // např. "block/magmator_face_unlit"
-
-    // Hledej odpovídající PNG soubor v iconsDir
-    const candidates = [
-      path.join(iconsDir, texNs, texPath + '.png'),                    // icons/powah/block/magmator_face_unlit.png
-      path.join(iconsDir, texNs, 'block', path.basename(texPath) + '.png'), // icons/powah/block/magmator_face_unlit.png
-    ];
-    let found = null;
-    for (const c of candidates) {
-      if (fs.existsSync(c)) { found = c; break; }
-    }
-    if (!found) continue;
-
-    const relUrl = found.replace(/\\/g, '/').replace(/.*\/icons\//, 'icons/');
-    blockPaths[key] = relUrl;
-    modelResolved++;
-  }
-  console.log(`   Doplněno z modelů: ${modelResolved}`);
 
   // ─── Vanilla Minecraft jar ────────────────────────────────────────────────
   // Minecraft textury nejsou v mods/ ale v .minecraft/versions/
@@ -316,26 +360,58 @@ function main() {
       const entries = parseZip(buf);
       let count = 0;
       for (const entry of entries) {
+        // Textury
         const m = entry.name.match(/^assets\/minecraft\/textures\/(items?|blocks?)\/(.+\.png)$/);
-        if (!m) continue;
-        const category = m[1];
-        const subpath  = m[2];
-        const outFile  = path.join(iconsDir, 'minecraft', category, subpath);
-        if (!fs.existsSync(outFile)) {
-          const data = extractEntry(buf, entry);
-          if (!data) continue;
-          fs.mkdirSync(path.dirname(outFile), { recursive: true });
-          fs.writeFileSync(outFile, data);
-          totalExtracted++;
-          count++;
+        if (m) {
+          const category = m[1];
+          const subpath  = m[2];
+          const outFile  = path.join(iconsDir, 'minecraft', category, subpath);
+          if (!fs.existsSync(outFile)) {
+            const data = extractEntry(buf, entry);
+            if (!data) continue;
+            fs.mkdirSync(path.dirname(outFile), { recursive: true });
+            fs.writeFileSync(outFile, data);
+            totalExtracted++;
+            count++;
+          }
+          const relUrl   = `icons/minecraft/${category}/${subpath}`.replace(/\\/g, '/');
+          const basename = path.basename(subpath, '.png');
+          const flatName = subpath.slice(0, -4).replace(/\//g, '_');
+          const isItem   = category === 'item' || category === 'items';
+          const store    = isItem ? itemPaths : blockPaths;
+          if (!store[`minecraft:${basename}`]) store[`minecraft:${basename}`] = relUrl;
+          if (flatName !== basename && !store[`minecraft:${flatName}`]) store[`minecraft:${flatName}`] = relUrl;
+          continue;
         }
-        const relUrl   = `icons/minecraft/${category}/${subpath}`.replace(/\\/g, '/');
-        const basename = path.basename(subpath, '.png');
-        const flatName = subpath.slice(0, -4).replace(/\//g, '_');
-        const isItem   = category === 'item' || category === 'items';
-        const store    = isItem ? itemPaths : blockPaths;
-        if (!store[`minecraft:${basename}`]) store[`minecraft:${basename}`] = relUrl;
-        if (flatName !== basename && !store[`minecraft:${flatName}`]) store[`minecraft:${flatName}`] = relUrl;
+
+        // Block model JSONy (pro vanilla bloky jako snow_block → snow textura)
+        const mj = entry.name.match(/^assets\/minecraft\/models\/block\/(.+\.json)$/);
+        if (mj) {
+          const name = path.basename(mj[1], '.json');
+          const key  = `minecraft:${name}`;
+          if (!blockModels[key]) {
+            const data = extractEntry(buf, entry);
+            if (data) {
+              try {
+                const json = JSON.parse(data.toString('utf8'));
+                const tex = json.textures || {};
+                const resolve = (names) => {
+                  for (const n of names) {
+                    const v = tex[n];
+                    if (v && typeof v === 'string' && !v.startsWith('#')) return v;
+                  }
+                  return null;
+                };
+                const top   = resolve(['top', 'end', 'all', 'up']);
+                const side  = resolve(['side', 'texture', 'all', 'wall']);
+                const front = resolve(['front', 'face', 'south', 'north', 'side']);
+                const first = top || side || front ||
+                  Object.values(tex).find(v => typeof v === 'string' && !v.startsWith('#'));
+                if (first) blockModels[key] = { top: top||first, side: side||first, front: front||first };
+              } catch {}
+            }
+          }
+        }
       }
       console.log(`   Extrahováno: ${count} vanilla textur`);
       console.log(`   Manifest klíčů minecraft: item=${Object.keys(itemPaths).filter(k=>k.startsWith('minecraft:')).length}, block=${Object.keys(blockPaths).filter(k=>k.startsWith('minecraft:')).length}`);
@@ -350,6 +426,62 @@ function main() {
     console.log('   Hledej v: .minecraft/versions/<verze>/<verze>.jar');
   }
 
+  // ─── Resolv block modelů → textury pro itemy bez přímé textury ──────────────
+  // Příklad: "powah:magmator_basic" nemá textures/block/magmator_basic.png
+  // ale má models/block/magmator_basic.json → textures.face = "powah:block/magmator_face_unlit"
+  console.log(`\n🔗 Resolvuji block modely (${Object.keys(blockModels).length} modelů)...`);
+  let modelResolved = 0;
+
+  function resolveTexRef(texRef) {
+    if (!texRef) return null;
+    const colon = texRef.indexOf(':');
+    if (colon === -1) return null;
+    const texNs   = texRef.slice(0, colon);
+    const texPath = texRef.slice(colon + 1);
+    const candidates = [
+      path.join(iconsDir, texNs, texPath + '.png'),
+      path.join(iconsDir, texNs, 'block', path.basename(texPath) + '.png'),
+    ];
+    for (const c of candidates) {
+      if (fs.existsSync(c)) {
+        return c.replace(/\\/g, '/').replace(/.*\/icons\//, 'icons/');
+      }
+    }
+    return null;
+  }
+
+  for (const [key, faces] of Object.entries(blockModels)) {
+    if (itemPaths[key]) continue; // má item texturu — přeskoč
+
+    const topUrl   = resolveTexRef(faces.top);
+    const sideUrl  = resolveTexRef(faces.side);
+    const frontUrl = resolveTexRef(faces.front);
+    const anyUrl   = topUrl || sideUrl || frontUrl;
+    if (!anyUrl) continue;
+
+    // Hlavní klíč → top textura (fallback pro starý kód)
+    if (!blockPaths[key]) blockPaths[key] = anyUrl;
+
+    // Tři plochy pod klíči s # suffixem
+    if (topUrl)   blockPaths[`${key}#top`]   = topUrl;
+    if (sideUrl)  blockPaths[`${key}#side`]  = sideUrl;
+    if (frontUrl) blockPaths[`${key}#front`] = frontUrl;
+
+    modelResolved++;
+  }
+  console.log(`   Doplněno z modelů: ${modelResolved}`);
+
+  // ─── GeckoLib geo modely → UV souřadnice hlavy ───────────────────────────────
+  console.log(`\n🦎 GeckoLib geo modely: ${Object.keys(geoModels).length}`);
+  let geoResolved = 0;
+  for (const [key, uv] of Object.entries(geoModels)) {
+    const entityUrl = blockPaths[key];
+    if (!entityUrl || !entityUrl.includes('/entity/')) continue;
+    blockPaths[`${key}#head_uv`] = JSON.stringify(uv);
+    geoResolved++;
+  }
+  console.log(`   Doplněno UV: ${geoResolved}`);
+
   // ─── Skenuj KubeJS a další statické asset složky ─────────────────────────
   const staticDirs = [
     path.join(instanceDir, 'kubejs', 'assets'),
@@ -361,14 +493,12 @@ function main() {
     console.log(`\n📁 Skenuju statické assety: ${staticDir}`);
     let staticCount = 0;
 
-    // Projdi <staticDir>/<namespace>/textures/**/*.png
     for (const nsEntry of fs.readdirSync(staticDir, { withFileTypes: true })) {
       if (!nsEntry.isDirectory()) continue;
       const ns     = nsEntry.name;
       const texDir = path.join(staticDir, ns, 'textures');
       if (!fs.existsSync(texDir)) continue;
 
-      // Rekurzivně projdi textures/
       const walkDir = (dir, relBase) => {
         for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
           const full = path.join(dir, e.name);
@@ -376,8 +506,6 @@ function main() {
           if (e.isDirectory()) { walkDir(full, rel); continue; }
           if (!e.name.endsWith('.png')) continue;
 
-          // rel je např. "item/foo.png" nebo "questpics/ae2.png"
-          // Zkopíruj do icons/
           const outFile = path.join(iconsDir, ns, 'textures', rel);
           if (!fs.existsSync(outFile)) {
             fs.mkdirSync(path.dirname(outFile), { recursive: true });
@@ -385,16 +513,12 @@ function main() {
             staticCount++;
           }
 
-          const relUrl  = `icons/${ns}/textures/${rel}`.replace(/\\/g, '/');
+          const relUrl   = `icons/${ns}/textures/${rel}`.replace(/\\/g, '/');
           const basename = path.basename(rel, '.png');
           const flatName = rel.slice(0, -4).replace(/\//g, '_');
 
-          // Klíč 1: basename "atm:bumble_title"
           if (!itemPaths[`${ns}:${basename}`]) itemPaths[`${ns}:${basename}`] = relUrl;
-          // Klíč 2: flat "atm:questpics_bumblezone_bumble_title"
           if (!itemPaths[`${ns}:${flatName}`]) itemPaths[`${ns}:${flatName}`] = relUrl;
-          // Klíč 3: přesná MC resource location "atm:textures/questpics/bumblezone/bumble_title.png"
-          //         rel je "questpics/bumblezone/bumble_title.png" → přidáme "textures/"
           const mcKey = `${ns}:textures/${rel}`;
           if (!itemPaths[mcKey]) itemPaths[mcKey] = relUrl;
         }
@@ -411,6 +535,49 @@ function main() {
     path.join(__dirname, 'icons_manifest.json'),
     JSON.stringify(manifest)
   );
+
+  // ─── Advancement JSONy → mapa advancement_id → item_id ───────────────────────
+  console.log(`\n🏆 Parsuju advancement JSONy...`);
+  const advMap = {};
+
+  const allJarPaths = [
+    ...fs.readdirSync(modsDir).filter(f => f.endsWith('.jar')).map(f => path.join(modsDir, f)),
+    ...(findVanillaJar(instanceDir) ? [findVanillaJar(instanceDir)] : []),
+  ];
+
+  for (const jarPath of allJarPaths) {
+    let buf;
+    try { buf = fs.readFileSync(jarPath); } catch { continue; }
+    const entries = parseZip(buf);
+    for (const entry of entries) {
+      const m = entry.name.match(
+        /^(?:common\/src\/main\/resources\/)?data\/([^/]+)\/advancements\/(.+\.json)$/
+      );
+      if (!m) continue;
+      const ns  = m[1];
+      const rel = m[2].slice(0, -5);
+      const key = `${ns}:${rel}`;
+      if (advMap[key]) continue;
+      const data = extractEntry(buf, entry);
+      if (!data) continue;
+      try {
+        const json = JSON.parse(data.toString('utf8'));
+        const itemId = json?.display?.icon?.id || json?.display?.icon?.item;
+        if (itemId) advMap[key] = itemId;
+        // Debug: loguj pokud klíč odpovídá hledaným
+        if (key.includes('dragon_egg') || key.includes('enchant_item') || key.includes('apotheosis')) {
+          console.log(`   [adv] ${key} → ${itemId || '(žádná ikona)'}`);
+        }
+      } catch {}
+    }
+  }
+
+  fs.writeFileSync(
+    path.join(__dirname, 'advancements_manifest.json'),
+    JSON.stringify(advMap)
+  );
+
+  console.log(`   Advancement → item mapování: ${Object.keys(advMap).length} záznamů`);
 
   console.log(`\n🎉 Hotovo!`);
   console.log(`   Extrahováno:     ${totalExtracted} souborů`);

@@ -343,6 +343,50 @@ header {
 .task-item .t-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .task-item .t-count { font-size: 0.74rem; color: var(--gold-dim); flex-shrink: 0; }
 
+/* Item stats badges */
+.task-item-wrap { display: flex; flex-direction: column; gap: 3px; }
+.item-stats { display: flex; flex-wrap: wrap; gap: 4px; padding: 0 10px 5px 38px; }
+
+/* Smart filter grid */
+.filter-items-grid {
+  display: flex; flex-wrap: wrap; gap: 3px;
+  padding: 4px 10px 6px 38px;
+}
+.filter-icon { display: inline-flex; cursor: default; }
+
+/* Rewards */
+.rewards-list { display: flex; flex-direction: column; gap: 3px; }
+.reward-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 4px 10px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-left: 2px solid rgba(255,200,60,0.4);
+  border-radius: 5px;
+  font-size: 0.82rem; color: var(--text-dim);
+}
+.reward-item .r-name { flex: 1; }
+.reward-xp-icon { width: 20px; text-align: center; flex-shrink: 0; }
+
+/* Wiki link */
+.popup-wiki {
+  position: absolute; top: 10px; right: 40px;
+  font-size: 1rem; text-decoration: none; opacity: 0.5;
+  transition: opacity 0.15s;
+}
+.popup-wiki:hover { opacity: 1; }
+.stat-badge {
+  display: inline-flex; align-items: center; gap: 3px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.09);
+  border-radius: 4px; padding: 1px 6px;
+  font-size: 0.70rem; color: var(--text-dim);
+}
+.stat-badge.dmg  { border-color: rgba(220,80,80,0.35);  color: #e89; }
+.stat-badge.arm  { border-color: rgba(80,140,220,0.35); color: #8ae; }
+.stat-badge.spd  { border-color: rgba(80,200,130,0.35); color: #7da; }
+.stat-badge.spec { border-color: rgba(200,160,60,0.35); color: #cc8; }
+
 /* No desc */
 .no-desc { font-style: italic; font-size: 0.85rem; color: var(--text-dim); opacity: 0.6; }
 
@@ -601,30 +645,47 @@ const MC_COLOR_MAP = {
 
 function mcToHtml(text) {
   if (!text) return '';
-  const parts = text.split(/&(?=[0-9a-fA-Flonmr])/);
-  let html = escHtml(parts[0]);
-  let activeColor = null;
-  for (let i = 1; i < parts.length; i++) {
-    const code = parts[i][0].toLowerCase();
-    const rest = parts[i].slice(1);
-    if (code === 'r') {
-      activeColor = null;
-      html += escHtml(rest);
-    } else if (code === 'l') {
-      html += `<span class="mc-bold">${escHtml(rest)}</span>`;
-    } else if (code === 'o') {
-      html += `<span class="mc-italic">${escHtml(rest)}</span>`;
-    } else if (code === 'n') {
-      html += `<span class="mc-underline">${escHtml(rest)}</span>`;
-    } else if (code === 'm') {
-      html += `<span class="mc-strike">${escHtml(rest)}</span>`;
-    } else if (MC_COLOR_MAP[code]) {
-      html += `<span class="mc-${code}">${escHtml(rest)}</span>`;
-    } else {
-      html += escHtml(parts[i]);
+
+  // Rozděl text na části: {image:...} tagy a zbytek
+  // Zpracuj je odděleně aby escHtml nezničil <img> tagy
+  const segments = [];
+  let last = 0;
+  const imgRe = /\{image:([^\s}]+)([^}]*)\}/g;
+  let m;
+  while ((m = imgRe.exec(text)) !== null) {
+    if (m.index > last) segments.push({ type: 'text', val: text.slice(last, m.index) });
+    const url = resolveImageUrl(m[1]);
+    if (url) {
+      const wm = m[2].match(/width:(\d+)/);
+      const hm = m[2].match(/height:(\d+)/);
+      const am = m[2].match(/align:(\w+)/);
+      const w  = wm ? `width:${wm[1]}px;max-width:100%;` : 'max-width:100%;';
+      const h  = hm ? `height:${hm[1]}px;` : '';
+      const bl = am && am[1] === 'center' ? 'display:block;margin:6px auto;' : 'display:inline-block;margin:4px 0;';
+      segments.push({ type: 'html', val: `<img src="${url}" style="${bl}${w}${h}image-rendering:pixelated;" alt="">` });
     }
+    last = m.index + m[0].length;
   }
-  return html;
+  if (last < text.length) segments.push({ type: 'text', val: text.slice(last) });
+
+  return segments.map(seg => {
+    if (seg.type === 'html') return seg.val;
+    // Zpracuj Minecraft color kódy
+    const parts = seg.val.split(/&(?=[0-9a-fA-Flonmr])/);
+    let html = escHtml(parts[0]);
+    for (let i = 1; i < parts.length; i++) {
+      const code = parts[i][0].toLowerCase();
+      const rest = parts[i].slice(1);
+      if      (code === 'r') html += escHtml(rest);
+      else if (code === 'l') html += `<span class="mc-bold">${escHtml(rest)}</span>`;
+      else if (code === 'o') html += `<span class="mc-italic">${escHtml(rest)}</span>`;
+      else if (code === 'n') html += `<span class="mc-underline">${escHtml(rest)}</span>`;
+      else if (code === 'm') html += `<span class="mc-strike">${escHtml(rest)}</span>`;
+      else if (MC_COLOR_MAP[code]) html += `<span class="mc-${code}">${escHtml(rest)}</span>`;
+      else html += escHtml(parts[i]);
+    }
+    return html;
+  }).join('');
 }
 
 function stripMc(text) {
@@ -639,12 +700,13 @@ function escHtml(s) {
 // Dva módy:
 //   ATLAS  — jeden velký icons_atlas.png + icons_atlas.json (pro hosting)
 //   FILES  — individuální soubory icons/namespace/item.png  (po extract_icons.js)
-let ICON_MODE  = null;   // 'atlas' | 'files' | null
-let ATLAS_META = null;   // { tile, cols, rows, icons: { id: {x,y} } }
-let FILES_MAP  = null;   // { id: "icons/ns/name.png" }
+let ICON_MODE  = null;
+let ATLAS_META = null;
+let FILES_MAP  = null;
+let ADV_MAP    = null;
+let ITEM_DATA  = null;   // itemId → { category, damage, armor, ... }
 
 async function loadIcons() {
-  // Zkus nejdřív atlas (priorita — menší přenos pro hosting)
   try {
     const res = await fetch('icons_atlas.json');
     if (res.ok) {
@@ -654,7 +716,6 @@ async function loadIcons() {
     }
   } catch {}
 
-  // Fallback / doplněk: individuální soubory
   try {
     const res = await fetch('icons_manifest.json');
     if (res.ok) {
@@ -664,7 +725,6 @@ async function loadIcons() {
     }
   } catch {}
 
-  // Chapter images manifest
   try {
     let res = await fetch('chapter_images_manifest.json');
     if (!res.ok) res = await fetch('icons_manifest.json');
@@ -672,18 +732,33 @@ async function loadIcons() {
     else if (res.ok) Object.assign(FILES_MAP, await res.json());
   } catch {}
 
-  // Vyčisti cache — mohly se nacachovat 'missing'/'error' před načtením manifestu
+  // Advancement → item mapa
+  try {
+    const res = await fetch('advancements_manifest.json');
+    if (res.ok) {
+      ADV_MAP = await res.json();
+      console.log(`Advancements manifest: ${Object.keys(ADV_MAP).length} záznamů`);
+    }
+  } catch {}
+
+  // Item data (statistiky zbraní, brnění, nástrojů)
+  try {
+    const res = await fetch('item_data.json');
+    if (res.ok) {
+      ITEM_DATA = await res.json();
+      console.log(`Item data: ${Object.keys(ITEM_DATA).length} itemů`);
+    }
+  } catch {}
+
   iconCache.clear();
   imageCache.clear();
-  console.log('ICON_MODE:', ICON_MODE, '| atlas icons:', ATLAS_META ? Object.keys(ATLAS_META.icons).length : 'none', '| files keys:', FILES_MAP ? Object.keys(FILES_MAP).length : 'none');
 }
 
-function itemIcon(itemId, fallbackEmoji) {
-  if (!itemId) return `<span>${fallbackEmoji}</span>`;
-  const TILE = 20;  // px jak chceme zobrazit (16px textura, ale 20px plocha)
+function itemIcon(itemId, fallbackEmoji, size = 20) {
+  if (!itemId) return `<span>${fallbackEmoji || ''}</span>`;
+  const TILE = size;
 
   if (ICON_MODE === 'atlas') {
-    // Zkus přímý lookup + varianty
     const entry = ATLAS_META.icons[itemId]
       || ATLAS_META.icons[`${itemId}_item`]
       || null;
@@ -724,7 +799,7 @@ function lookupIconId(itemId) {
   ];
 }
 
-// Vrátí true pokud URL textury pochází z textures/block/ → renderovat jako 3D kostku
+// Vrátí true pokud URL textury pochází z textures/block/
 function isBlockTexture(itemId) {
   if (!FILES_MAP) return false;
   const variants = lookupIconId(itemId);
@@ -735,60 +810,57 @@ function isBlockTexture(itemId) {
   return false;
 }
 
+// Vrátí true pokud je textura entity sprite sheet
+function isEntityTexture(itemId) {
+  if (!FILES_MAP) return false;
+  const variants = lookupIconId(itemId);
+  for (const v of variants) {
+    const url = FILES_MAP[v];
+    if (url) return url.includes('/entity/');
+  }
+  return false;
+}
+
 // Nakreslí izometrickou 3D kostku z jedné textury. Střed na (0,0).
-function drawIsoCube(ctx, img, size) {
-  const w = size;        // polovina šířky
-  const h = size * 0.5; // výška top plochy
-  const d = size;        // výška bočních stran
+function drawIsoCube(ctx, imgTop, imgSide, imgFront, size) {
+  const w = size * 0.5;
+  const h = w * 0.5;
+  const d = w * 0.7;
 
-  // 6 viditelných rohů kostky ve screen space
-  const top  = [0,      -(h + d)];
-  const lt   = [-w,     -d      ];
-  const rt   = [ w,     -d      ];
-  const mid  = [0,      -(d - h)]; // střed kde se setkávají 3 plochy = (0, h-d)
-  const lb   = [-w,      h      ];
-  const rb   = [ w,      h      ];
-  const bot  = [0,       d - h  ];
+  const top  = [0,  -(h + d)];
+  const lt   = [-w, -d      ];
+  const rt   = [ w, -d      ];
+  const mid  = [0,  -(d - h)];
+  const lb   = [-w,  h      ];
+  const rb   = [ w,  h      ];
+  const bot  = [0,   2 * h  ];
 
-  // Mapuj texturu na parallelogram pomocí affine transformu
-  // p0=TL, p1=TR, p2=BR, p3=BL (po směru hodinových ručiček)
-  function drawFace(p0, p1, p2, p3, brightness) {
+  function drawFace(img, p0, p1, p2, p3, brightness) {
+    if (!img) return;
     const T = img.naturalWidth || 16;
-    // Affine: mapuj (0,0)→p0, (T,0)→p1, (0,T)→p3
-    const ax = (p1[0] - p0[0]) / T;
-    const ay = (p1[1] - p0[1]) / T;
-    const bx = (p3[0] - p0[0]) / T;
-    const by = (p3[1] - p0[1]) / T;
-
+    const ax = (p1[0]-p0[0])/T, ay = (p1[1]-p0[1])/T;
+    const bx = (p3[0]-p0[0])/T, by = (p3[1]-p0[1])/T;
     ctx.save();
     ctx.beginPath();
-    ctx.moveTo(p0[0], p0[1]); ctx.lineTo(p1[0], p1[1]);
-    ctx.lineTo(p2[0], p2[1]); ctx.lineTo(p3[0], p3[1]);
+    ctx.moveTo(p0[0],p0[1]); ctx.lineTo(p1[0],p1[1]);
+    ctx.lineTo(p2[0],p2[1]); ctx.lineTo(p3[0],p3[1]);
     ctx.closePath();
     ctx.clip();
     ctx.transform(ax, ay, bx, by, p0[0], p0[1]);
     ctx.drawImage(img, 0, 0, T, T);
-    // Ztmavení přes poloprůhledný overlay
     if (brightness < 1) {
-      ctx.fillStyle = `rgba(0,0,0,${(1 - brightness).toFixed(2)})`;
+      ctx.fillStyle = `rgba(0,0,0,${(1-brightness).toFixed(2)})`;
       ctx.fillRect(0, 0, T, T);
     }
     ctx.restore();
   }
 
-  // Střed kostky = průměr všech viditelných bodů → vycentruj
-  const cy = (top[1] + lb[1]) / 2;
-
+  const cy = (top[1] + bot[1]) / 2;
   ctx.save();
   ctx.translate(0, -cy);
-
-  // TOP face:   lt → top → rt → mid   (nejsvětlejší)
-  drawFace(lt, top, rt, mid, 1.0);
-  // LEFT face:  lt → mid → bot → lb   (střední)
-  drawFace(lt, mid, bot, lb, 0.65);
-  // RIGHT face: mid → rt → rb → bot   (nejtmavší)
-  drawFace(mid, rt, rb, bot, 0.80);
-
+  drawFace(imgTop,   lt,  top, rt,  mid, 1.0);
+  drawFace(imgFront, lt,  mid, bot, lb,  0.65);
+  drawFace(imgSide,  mid, rt,  rb,  bot, 0.80);
   ctx.restore();
 }
 
@@ -865,12 +937,96 @@ function getAnimFrame(items, intervalMs = 1000) {
   return items[idx];
 }
 
-// Vrátí item ID k zobrazení pro daný quest (s podporou animace smart_filter)
-// Animační frame — střídá se každou vteřinu
-let animFrame = 0;
-setInterval(() => { animFrame++; requestDraw(); }, 1000);
-function getAnimFrame(items) {
-  return items[animFrame % items.length];
+// Vrátí HTML se statistikami itemu nebo '' pokud žádné nejsou
+function renderItemStats(itemId) {
+  if (!ITEM_DATA || !itemId) return '';
+  const d = ITEM_DATA[itemId];
+  if (!d) return '';
+
+  const badges = [];
+
+  // Kategorie ikona
+  const catIcon = {
+    sword: '⚔️', axe: '🪓', bow: '🏹', crossbow: '🏹', trident: '🔱',
+    pickaxe: '⛏️', shovel: '🪚', hoe: '🌾', tool: '🔧',
+    helmet: '🪖', chestplate: '🥋', leggings: '👖', boots: '👢',
+    armor: '🛡️', shield: '🛡️', weapon: '⚔️',
+  }[d.category] || '';
+
+  // Damage
+  if (d.damage) {
+    const dmg = Math.round(d.damage * 10) / 10;
+    badges.push(`<span class="stat-badge dmg">⚔️ ${dmg} dmg</span>`);
+  }
+  // Attack speed (vanilla = 4.0, zobraz jen pokud je jiný)
+  if (d.attack_speed !== undefined) {
+    const spd = Math.round(d.attack_speed * 10) / 10;
+    badges.push(`<span class="stat-badge spd">⚡ ${spd}/s</span>`);
+  }
+  // Armor
+  if (d.armor) {
+    const arm = Math.round(d.armor * 10) / 10;
+    badges.push(`<span class="stat-badge arm">🛡️ ${arm} armor</span>`);
+  }
+  // Toughness
+  if (d.toughness) {
+    const t = Math.round(d.toughness * 10) / 10;
+    badges.push(`<span class="stat-badge arm">💎 ${t} tough</span>`);
+  }
+  // Max health bonus
+  if (d.max_health) {
+    const h = Math.round(d.max_health * 10) / 10;
+    badges.push(`<span class="stat-badge spec">❤️ +${h} hp</span>`);
+  }
+  // Knockback resistance
+  if (d.knockback_res) {
+    const k = Math.round(d.knockback_res * 100);
+    badges.push(`<span class="stat-badge spec">🗿 ${k}% kb res</span>`);
+  }
+  // Crit chance / damage
+  if (d.crit_chance) badges.push(`<span class="stat-badge spec">🎯 ${Math.round(d.crit_chance*100)}% crit</span>`);
+  if (d.crit_damage) badges.push(`<span class="stat-badge dmg">💥 ${Math.round(d.crit_damage*100)}% crit dmg</span>`);
+
+  if (badges.length === 0) return '';
+  return `<div class="item-stats">${badges.join('')}</div>`;
+}
+
+// Mapa namespace → wiki URL
+const WIKI_URLS = {
+  'minecraft':            'https://minecraft.wiki/w/',
+  'create':               'https://create.fandom.com/wiki/',
+  'mekanism':             'https://wiki.mekanism.com/wiki/',
+  'ae2':                  'https://ae2.ae-mod.info/',
+  'appliedenergistics2':  'https://ae2.ae-mod.info/',
+  'thermal':              'https://teamcofh.com/docs/',
+  'immersiveengineering': 'https://ftb.fandom.com/wiki/Immersive_Engineering',
+  'ars_nouveau':          'https://www.arsnouveau.wiki/',
+  'occultism':            'https://klikli-dev.github.io/occultism/',
+  'pneumaticcraft':       'https://pneumaticcraft.com/wiki/',
+  'refinedStorage':       'https://refinedmods.com/refined-storage/',
+  'refinedstorage':       'https://refinedmods.com/refined-storage/',
+  'powah':                'https://ftb.fandom.com/wiki/Powah',
+  'tconstruct':           'https://tinkers-construct.fandom.com/wiki/',
+  'apotheosis':           'https://ftb.fandom.com/wiki/Apotheosis',
+  'botania':              'https://botaniamod.net/changelog.shtml',
+  'twilightforest':       'https://ftb.fandom.com/wiki/Twilight_Forest',
+  'undergarden':          'https://ftb.fandom.com/wiki/The_Undergarden',
+  'iceandfire':           'https://ice-and-fire-mod.fandom.com/wiki/',
+};
+
+function getWikiUrl(q) {
+  // Zkus z ikony / prvního tasku zjistit namespace
+  const info = getQuestIconId(q);
+  const id = info?.id || q.tasks?.[0]?.item || q.tasks?.[0]?.entity;
+  if (!id) return null;
+  const ns = id.split(':')[0];
+  const name = id.split(':')[1];
+  const base = WIKI_URLS[ns];
+  if (!base) return null;
+  if (ns === 'minecraft') {
+    return base + name.split('_').map(w => w[0].toUpperCase() + w.slice(1)).join('_');
+  }
+  return base;
 }
 
 function getQuestIconId(q) {
@@ -881,23 +1037,81 @@ function getQuestIconId(q) {
   if (first.item === 'ftbfiltersystem:smart_filter' && first.filter_items?.length) {
     return { id: getAnimFrame(first.filter_items) };
   }
+  if (first.type === 'kill' && first.entity) {
+    // Zkus spawn egg nejdřív, pak fallback na entity texturu
+    const [ns, name] = first.entity.split(':');
+    const egg = `${ns}:${name}_spawn_egg`;
+    if (FILES_MAP?.[egg] || ATLAS_META?.icons?.[egg]) return { id: egg };
+    return { id: first.entity };
+  }
+  if (first.type === 'advancement' && first.advancement) {
+    // Nejdřív zkus ADV_MAP (z advancement JSON display.icon)
+    const itemId = ADV_MAP?.[first.advancement];
+    if (itemId) return { id: itemId };
+    // Fallback: poslední část cesty jako item ID (např. "minecraft:end/dragon_egg" → "minecraft:dragon_egg")
+    const parts = first.advancement.split(':');
+    if (parts.length === 2) {
+      const name = parts[1].split('/').pop(); // "dragon_egg"
+      const fallbackId = `${parts[0]}:${name}`;
+      return { id: fallbackId };
+    }
+    return null;
+  }
   return { id: first.item || first.entity || null };
 }
 
 function drawQuestIcon(ctx, q, size) {
   const info = getQuestIconId(q);
   if (!info || !info.id) return false;
-  const img = getCanvasIcon(info.id);
-  if (!img) return false;
 
   ctx.save();
   ctx.imageSmoothingEnabled = false;
+
   if (isBlockTexture(info.id)) {
-    drawIsoCube(ctx, img, size * 0.72);
+    const imgTop   = getCanvasIcon(info.id + '#top')   || getCanvasIcon(info.id);
+    const imgSide  = getCanvasIcon(info.id + '#side')  || getCanvasIcon(info.id);
+    const imgFront = getCanvasIcon(info.id + '#front') || getCanvasIcon(info.id);
+    if (!imgTop && !imgSide && !imgFront) { ctx.restore(); return false; }
+    drawIsoCube(ctx, imgTop, imgSide, imgFront, size * 0.72);
+  } else if (isEntityTexture(info.id)) {
+    const img = getCanvasIcon(info.id);
+    if (!img) { ctx.restore(); return false; }
+    const sw = img.naturalWidth, sh = img.naturalHeight;
+
+    // Zkus GeckoLib UV metadata
+    const uvRaw = FILES_MAP?.[info.id + '#head_uv'];
+    if (uvRaw) {
+      try {
+        const uv = JSON.parse(uvRaw);
+        // uv.u, uv.v = pixel offset na texture, uv.size = [w,h,d] nebo [w,h]
+        const uw = (uv.size?.[0] ?? 8);
+        const uh = (uv.size?.[1] ?? 8);
+        const half = size / 2;
+        ctx.drawImage(img, uv.u, uv.v, uw, uh, -half, -half, size, size);
+        ctx.restore(); return true;
+      } catch {}
+    }
+
+    // Fallback: Minecraft skin layout (hlava = 8,8 → 16,16 z 64x64)
+    // Pro non-humanoid mobs zkus první osminu textury
+    const ratio = sw / sh;
+    let sx, sy, sSize;
+    if (Math.abs(ratio - 1) < 0.1) {
+      // Čtvercová textura — pravděpodobně jednoduchý mob, použij celou
+      sx = 0; sy = 0; sSize = sw;
+    } else {
+      // Minecraft skin 2:1 poměr — hlava v 8,8
+      sx = sw * 8/64; sy = sh * 8/64; sSize = sw * 8/64;
+    }
+    const half = size / 2;
+    ctx.drawImage(img, sx, sy, sSize, sSize, -half, -half, size, size);
   } else {
+    const img = getCanvasIcon(info.id);
+    if (!img) { ctx.restore(); return false; }
     const half = size / 2;
     ctx.drawImage(img, -half, -half, size, size);
   }
+
   ctx.restore();
   return true;
 }
@@ -995,7 +1209,9 @@ function buildSidebar() {
     html += `<div class="group-header">${escHtml(g)}</div>`;
     for (const ch of groups[g]) {
       const title = stripMc(ch.title);
+      const iconHtml = ch.icon ? itemIcon(ch.icon, '', 16) : '<span style="width:16px;flex-shrink:0;display:inline-block"></span>';
       html += `<button class="chapter-btn" data-id="${escHtml(ch.id)}" onclick="selectChapter('${escHtml(ch.id)}')">
+        ${iconHtml}
         <span class="ch-name">${escHtml(title)}</span>
         <span class="ch-count">${ch.quests.length}</span>
       </button>`;
@@ -1538,10 +1754,16 @@ function openPopup(q, screenX, screenY) {
   const body   = document.getElementById('popupBody');
 
   // Header
+  const wikiUrl = getWikiUrl(q);
+  const wikiBtn = wikiUrl
+    ? `<a class="popup-wiki" href="${wikiUrl}" target="_blank" title="Open wiki">📖</a>`
+    : '';
+
   header.innerHTML = `
     <button class="popup-close" id="popupClose" onclick="closePopup()">✕</button>
     <div class="popup-title">${mcToHtml(q.title)}</div>
     ${q.subtitle ? `<div class="popup-subtitle">${mcToHtml(q.subtitle)}</div>` : ''}
+    ${wikiBtn}
   `;
 
   // Body
@@ -1560,6 +1782,26 @@ function openPopup(q, screenX, screenY) {
     for (const t of q.tasks) {
       const emoji = taskIcon(t.type);
       let name = '', iconHtml = '';
+
+      // ── Smart filter — rozviň obsah filtru ─────────────────────────────────
+      if (t.item === 'ftbfiltersystem:smart_filter' && t.filter_items?.length) {
+        const cnt = t.count && t.count > 1 ? `<span class="t-count">×${t.count}</span>` : '';
+        const filterIcons = t.filter_items.map(id => {
+          const iname = id.split(':').pop().replace(/_/g, ' ');
+          return `<span class="filter-icon" title="${escHtml(id)}">${itemIcon(id, '?', 18)}</span>`;
+        }).join('');
+        html += `
+          <div class="task-item-wrap">
+            <div class="task-item">
+              ${itemIcon('ftbfiltersystem:smart_filter', '🔍', 20)}
+              <span class="t-name">Any of ${t.filter_items.length} items</span>
+              ${cnt}
+            </div>
+            <div class="filter-items-grid">${filterIcons}</div>
+          </div>`;
+        continue;
+      }
+
       if (t.item) {
         name = t.item.split(':').pop().replace(/_/g, ' ');
         iconHtml = itemIcon(t.item, emoji);
@@ -1582,7 +1824,36 @@ function openPopup(q, screenX, screenY) {
         name = t.type; iconHtml = `<span>${emoji}</span>`;
       }
       const cnt = t.count && t.count > 1 ? `<span class="t-count">×${t.count}</span>` : '';
-      html += `<div class="task-item">${iconHtml}<span class="t-name">${escHtml(name)}</span>${cnt}</div>`;
+      const stats = t.item ? renderItemStats(t.item) : '';
+      const taskRow = `<div class="task-item">${iconHtml}<span class="t-name">${escHtml(name)}</span>${cnt}</div>`;
+      html += stats
+        ? `<div class="task-item-wrap">${taskRow}${stats}</div>`
+        : taskRow;
+    }
+    html += `</div>`;
+  }
+
+  if (q.rewards && q.rewards.length > 0) {
+    html += `<div class="popup-divider"></div><div class="section-label">Rewards</div>`;
+    html += `<div class="rewards-list">`;
+    for (const r of q.rewards) {
+      if (r.type === 'item' && r.item) {
+        const name = r.item.split(':').pop().replace(/_/g, ' ');
+        const cnt  = r.count && r.count > 1 ? `<span class="t-count">×${r.count}</span>` : '';
+        html += `<div class="reward-item">${itemIcon(r.item, '📦', 20)}<span class="r-name">${escHtml(name)}</span>${cnt}</div>`;
+      } else if (r.type === 'xp') {
+        html += `<div class="reward-item"><span class="reward-xp-icon">✨</span><span class="r-name">${r.xp} XP</span></div>`;
+      } else if (r.type === 'xp_levels') {
+        html += `<div class="reward-item"><span class="reward-xp-icon">⭐</span><span class="r-name">${r.xp_levels} level${r.xp_levels > 1 ? 's' : ''}</span></div>`;
+      } else if (r.type === 'random') {
+        html += `<div class="reward-item"><span class="reward-xp-icon">🎲</span><span class="r-name">Random reward</span></div>`;
+      } else if (r.type === 'choice') {
+        html += `<div class="reward-item"><span class="reward-xp-icon">🎁</span><span class="r-name">Choice reward</span></div>`;
+      } else if (r.type === 'loot') {
+        html += `<div class="reward-item"><span class="reward-xp-icon">📦</span><span class="r-name">Loot reward</span></div>`;
+      } else if (r.type === 'blood') {
+        html += `<div class="reward-item"><span class="reward-xp-icon">🩸</span><span class="r-name">${r.blood} Blood</span></div>`;
+      }
     }
     html += `</div>`;
   }

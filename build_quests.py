@@ -243,9 +243,13 @@ def parse_chapter_file(filepath):
     shape_m = re.search(r'default_quest_shape\s*:\s*"([^"]+)"', text)
     chapter['default_shape'] = shape_m.group(1) if shape_m else 'rsquare'
 
-    # Icon (jen string form)
-    icon_m = re.search(r'^\bicon\s*:\s*"([^"]+)"', text, re.MULTILINE)
-    chapter['icon'] = icon_m.group(1) if icon_m else ''
+    # Icon — string nebo blok { id: "..." }
+    icon_str = re.search(r'^\t?icon\s*:\s*"([^"]+)"', text, re.MULTILINE)
+    if icon_str:
+        chapter['icon'] = icon_str.group(1)
+    else:
+        icon_block = re.search(r'^\t?icon\s*:\s*\{[^}]*\bid\s*:\s*"([^"]+)"', text, re.MULTILINE | re.DOTALL)
+        chapter['icon'] = icon_block.group(1) if icon_block else ''
 
     # Dekorativní obrázky na mapě
     chapter['images'] = parse_chapter_images(text)
@@ -277,6 +281,47 @@ def parse_chapter_file(filepath):
                 chapter['quests'].append(quest)
 
     return chapter
+
+
+def parse_reward(block):
+    """Parsuje jeden reward blok."""
+    rtype = get_field_str(block, 'type')
+    if not rtype:
+        return None
+
+    r = {'type': rtype}
+
+    if rtype == 'xp':
+        xp = get_field_num(block, 'xp')
+        if xp is not None: r['xp'] = int(xp)
+
+    elif rtype == 'xp_levels':
+        lvl = get_field_num(block, 'xp_levels')
+        if lvl is not None: r['xp_levels'] = int(lvl)
+
+    elif rtype == 'item':
+        count = get_field_num(block, 'count')
+        if count is not None: r['count'] = int(count)
+        # item může být string nebo blok { id: "..." }
+        item_str = re.search(r'^\s*item\s*:\s*"([^"]+)"', block, re.MULTILINE)
+        if item_str:
+            r['item'] = item_str.group(1)
+        else:
+            item_id = re.search(r'\bitem\s*:\s*\{[^}]*\bid\s*:\s*"([^"]+)"', block, re.DOTALL)
+            if item_id:
+                r['item'] = item_id.group(1)
+                inner_count = re.search(r'\bitem\s*:\s*\{[^}]*\bcount\s*:\s*(\d+)', block, re.DOTALL)
+                if inner_count and not r.get('count'):
+                    r['count'] = int(inner_count.group(1))
+
+    elif rtype in ('random', 'choice', 'loot'):
+        r['table'] = True  # náhodný loot table — zobrazíme jen ikonu
+
+    elif rtype == 'blood':
+        amt = get_field_num(block, 'blood')
+        if amt is not None: r['blood'] = int(amt)
+
+    return r
 
 
 def parse_quest_block(block, default_shape):
@@ -330,6 +375,16 @@ def parse_quest_block(block, default_shape):
             tasks.append(task)
     if tasks:
         quest['tasks'] = tasks
+
+    # Rewards
+    reward_blocks = get_list_of_blocks(block, 'rewards')
+    rewards = []
+    for rb in reward_blocks:
+        r = parse_reward(rb)
+        if r:
+            rewards.append(r)
+    if rewards:
+        quest['rewards'] = rewards
 
     return quest
 
