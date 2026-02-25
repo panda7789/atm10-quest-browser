@@ -196,7 +196,8 @@ function findStaticAssetDirs(modsDir) {
 function main() {
   const modsDir     = findModsDir(process.argv[2]);
   const instanceDir = path.dirname(modsDir);
-  const iconsDir    = path.join(__dirname, 'icons');
+  const DATA_DIR    = path.join(__dirname, 'data');
+  const iconsDir    = path.join(DATA_DIR, 'icons');
   fs.mkdirSync(iconsDir, { recursive: true });
 
   const jars = fs.readdirSync(modsDir).filter(f => f.endsWith('.jar')).sort();
@@ -529,10 +530,18 @@ function main() {
   }
 
   // Sestavení manifestu: item textura má přednost, block jako fallback
-  const manifest = Object.assign({}, blockPaths, itemPaths);
+  // Přidej "data/" prefix ke všem cestám — soubory jsou v data/icons/ ale index.html je v kořeni
+  const raw = Object.assign({}, blockPaths, itemPaths);
+  const manifest = {};
+  for (const [k, v] of Object.entries(raw)) {
+    // head_uv obsahuje JSON string, ne cestu — nepřidávej prefix
+    manifest[k] = (typeof v === 'string' && v.startsWith('icons/'))
+      ? 'data/' + v
+      : v;
+  }
 
   fs.writeFileSync(
-    path.join(__dirname, 'icons_manifest.json'),
+    path.join(DATA_DIR, 'icons_manifest.json'),
     JSON.stringify(manifest)
   );
 
@@ -573,7 +582,7 @@ function main() {
   }
 
   fs.writeFileSync(
-    path.join(__dirname, 'advancements_manifest.json'),
+    path.join(DATA_DIR, 'advancements_manifest.json'),
     JSON.stringify(advMap)
   );
 

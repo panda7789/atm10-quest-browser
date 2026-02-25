@@ -582,7 +582,8 @@ if __name__ == '__main__':
         sys.exit(1)
 
     root_dir = sys.argv[1]
-    output_file = sys.argv[2] if len(sys.argv) > 2 else 'quests.json'
+    output_file = sys.argv[2] if len(sys.argv) > 2 else 'data/quests.json'
+    os.makedirs(os.path.dirname(output_file), exist_ok=True)
 
     if not os.path.isdir(root_dir):
         print(f"❌ Složka nenalezena: {root_dir}")

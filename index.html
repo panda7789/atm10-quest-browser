@@ -615,6 +615,12 @@ mark { background: rgba(212,168,67,0.25); color: var(--gold2); border-radius: 2p
 
 <script>
 'use strict';
+// ─── CONFIG ───────────────────────────────────────────────────────────────────
+// Složka s dynamickými daty (quests.json, icons/, manifesty).
+// Lokálně: '' (vedle index.html)
+// Docker s volume: 'data/'
+const DATA_PATH = 'data/';
+
 // ─── STATE ────────────────────────────────────────────────────────────────────
 let DATA = null;                 // loaded JSON
 let activeChapter = null;        // chapter object
@@ -708,7 +714,7 @@ let ITEM_DATA  = null;   // itemId → { category, damage, armor, ... }
 
 async function loadIcons() {
   try {
-    const res = await fetch('icons_atlas.json');
+    const res = await fetch(DATA_PATH + 'icons_atlas.json');
     if (res.ok) {
       ATLAS_META = await res.json();
       ICON_MODE = 'atlas';
@@ -717,7 +723,7 @@ async function loadIcons() {
   } catch {}
 
   try {
-    const res = await fetch('icons_manifest.json');
+    const res = await fetch(DATA_PATH + 'icons_manifest.json');
     if (res.ok) {
       FILES_MAP = await res.json();
       if (!ICON_MODE) ICON_MODE = 'files';
@@ -726,15 +732,15 @@ async function loadIcons() {
   } catch {}
 
   try {
-    let res = await fetch('chapter_images_manifest.json');
-    if (!res.ok) res = await fetch('icons_manifest.json');
+    let res = await fetch(DATA_PATH + 'chapter_images_manifest.json');
+    if (!res.ok) res = await fetch(DATA_PATH + 'icons_manifest.json');
     if (res.ok && !FILES_MAP) FILES_MAP = await res.json();
     else if (res.ok) Object.assign(FILES_MAP, await res.json());
   } catch {}
 
   // Advancement → item mapa
   try {
-    const res = await fetch('advancements_manifest.json');
+    const res = await fetch(DATA_PATH + 'advancements_manifest.json');
     if (res.ok) {
       ADV_MAP = await res.json();
       console.log(`Advancements manifest: ${Object.keys(ADV_MAP).length} záznamů`);
@@ -743,7 +749,7 @@ async function loadIcons() {
 
   // Item data (statistiky zbraní, brnění, nástrojů)
   try {
-    const res = await fetch('item_data.json');
+    const res = await fetch(DATA_PATH + 'item_data.json');
     if (res.ok) {
       ITEM_DATA = await res.json();
       console.log(`Item data: ${Object.keys(ITEM_DATA).length} itemů`);
@@ -769,7 +775,7 @@ function itemIcon(itemId, fallbackEmoji, size = 20) {
       const bgH     = ATLAS_META.height * scale;
       const bgX     = -(entry.x * scale);
       const bgY     = -(entry.y * scale);
-      return `<span style="display:inline-block;width:${TILE}px;height:${TILE}px;flex-shrink:0;image-rendering:pixelated;background:url('icons_atlas.webp') ${bgX}px ${bgY}px / ${bgW}px ${bgH}px no-repeat;" title="${escHtml(itemId)}"></span>`;
+      return `<span style="display:inline-block;width:${TILE}px;height:${TILE}px;flex-shrink:0;image-rendering:pixelated;background:url('${DATA_PATH}icons_atlas.webp') ${bgX}px ${bgY}px / ${bgW}px ${bgH}px no-repeat;" title="${escHtml(itemId)}"></span>`;
     }
   }
 
@@ -883,8 +889,8 @@ function getCanvasIcon(itemId) {
     if (entry) {
       if (!getCanvasIcon._atlasImg) {
         const img = new Image();
-        img.src = 'icons_atlas.webp';
-        img.onerror = () => { img.src = 'icons_atlas.png'; };
+        img.src = DATA_PATH + 'icons_atlas.webp';
+        img.onerror = () => { img.src = DATA_PATH + 'icons_atlas.png'; };
         getCanvasIcon._atlasImg = img;
       }
       const atlasImg = getCanvasIcon._atlasImg;
@@ -1172,7 +1178,7 @@ function drawChapterImages(ctx, chapter) {
 async function loadData() {
   try {
     const [questRes] = await Promise.all([
-      fetch('quests.json'),
+      fetch(DATA_PATH + 'quests.json'),
       loadIcons(),
     ]);
     if (!questRes.ok) throw new Error(`HTTP ${questRes.status}`);

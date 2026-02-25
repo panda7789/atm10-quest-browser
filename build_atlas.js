@@ -17,9 +17,11 @@
 const fs   = require('fs');
 const path = require('path');
 
+const DATA_DIR = path.join(__dirname, 'data');
+
 // ─── Načti quests.json a zjisti vše co potřebuje ikonu ───────────────────────
 function loadManifest() {
-  const manifestPath = path.join(__dirname, 'icons_manifest.json');
+  const manifestPath = path.join(DATA_DIR, 'icons_manifest.json');
   if (!fs.existsSync(manifestPath)) {
     console.error('❌ icons_manifest.json nenalezen. Nejdřív spusť extract_icons.js');
     process.exit(1);
@@ -49,7 +51,7 @@ function findIconPath(id, manifest) {
 }
 
 function getUsedIds() {
-  const data = JSON.parse(fs.readFileSync(path.join(__dirname, 'quests.json'), 'utf8'));
+  const data = JSON.parse(fs.readFileSync(path.join(DATA_DIR, 'quests.json'), 'utf8'));
   const taskItems  = new Set();  // malé ikony (16x16) → do atlasu
   const chapterImages = new Set();  // velké dekorativní obrázky → jako soubory
 
@@ -139,9 +141,9 @@ async function buildAtlas(iconPaths, usedIds) {
   process.stdout.write(`\r  Zpracováno: ${count}/${count}\n`);
 
   // Ulož jako PNG a WebP
-  const outPng  = path.join(__dirname, 'icons_atlas.png');
-  const outWebp = path.join(__dirname, 'icons_atlas.webp');
-  const outJson = path.join(__dirname, 'icons_atlas.json');
+  const outPng  = path.join(DATA_DIR, 'icons_atlas.png');
+  const outWebp = path.join(DATA_DIR, 'icons_atlas.webp');
+  const outJson = path.join(DATA_DIR, 'icons_atlas.json');
 
   console.log('💾 Ukládám PNG...');
   await base.clone().png({ compressionLevel: 9, palette: false }).toFile(outPng);
@@ -172,7 +174,7 @@ async function buildAtlas(iconPaths, usedIds) {
 
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
 async function main() {
-  const iconsDir = path.join(__dirname, 'icons');
+  const iconsDir = path.join(DATA_DIR, 'icons');
   if (!fs.existsSync(iconsDir)) {
     console.error('❌ Složka icons/ nenalezena. Nejdřív spusť extract_icons.js');
     process.exit(1);
@@ -200,7 +202,7 @@ async function main() {
 
   // ── Chapter images → zkopíruj jako soubory ────────────
   console.log('\n🖼️  Zpracovávám chapter images...');
-  const imagesDir = path.join(__dirname, 'chapter_images');
+  const imagesDir = path.join(DATA_DIR, 'chapter_images');
   fs.mkdirSync(imagesDir, { recursive: true });
   const imageManifest = {};
   let imgFound = 0, imgMissing = 0;
@@ -221,7 +223,7 @@ async function main() {
 
   // Ulož image manifest
   fs.writeFileSync(
-    path.join(__dirname, 'chapter_images_manifest.json'),
+    path.join(DATA_DIR, 'chapter_images_manifest.json'),
     JSON.stringify(imageManifest)
   );
   console.log(`   Uloženo: chapter_images_manifest.json`);
