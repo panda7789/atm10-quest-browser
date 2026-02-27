@@ -8,19 +8,19 @@
 <style>
 /* ─── VARIABLES ─────────────────────────────────────────────────────── */
 :root {
-  --bg:        #161920;
-  --bg2:       #1c2030;
-  --bg3:       #232840;
-  --bg4:       #2a3050;
-  --border:    #262d3f;
-  --border2:   #313b52;
+  --bg:        #1a1f2e;
+  --bg2:       #212638;
+  --bg3:       #2a3048;
+  --bg4:       #323858;
+  --border:    #323a52;
+  --border2:   #3e4868;
   --gold:      #d4a843;
-  --gold2:     #e8c060;
-  --gold-dim:  #7a5c20;
-  --gold-glow: rgba(212,168,67,0.12);
-  --text:      #c8bfa8;
-  --text-dim:  #6a6050;
-  --text-bright: #ede0c4;
+  --gold2:     #ecc96a;
+  --gold-dim:  #9a7a38;
+  --gold-glow: rgba(212,168,67,0.14);
+  --text:      #d8d0bc;
+  --text-dim:  #8c8070;
+  --text-bright: #f0e8d0;
   --sidebar: 300px;
   --header: 52px;
 }
@@ -71,7 +71,7 @@ header {
 #chapterTitle {
   font-family: 'Cinzel', serif;
   font-size: 0.8rem;
-  color: var(--text-dim);
+  color: var(--text);
   letter-spacing: 0.08em;
   flex: 1;
   overflow: hidden;
@@ -88,23 +88,23 @@ header {
   left: 10px;
   top: 50%;
   transform: translateY(-50%);
-  color: var(--text-dim);
+  color: var(--text);
   font-size: 0.8rem;
   pointer-events: none;
 }
 #searchInput {
   background: var(--bg3);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border2);
   border-radius: 5px;
   padding: 6px 10px 6px 28px;
-  color: var(--text);
+  color: var(--text-bright);
   font-family: 'Source Serif 4', serif;
   font-size: 0.85rem;
   width: 200px;
   outline: none;
   transition: border-color 0.2s, width 0.2s;
 }
-#searchInput:focus { border-color: var(--gold-dim); width: 260px; }
+#searchInput:focus { border-color: var(--gold); width: 260px; }
 #searchInput::placeholder { color: var(--text-dim); }
 
 /* ─── LAYOUT ─────────────────────────────────────────────────────────── */
@@ -157,14 +157,14 @@ header {
   background: none;
   border: none;
   cursor: pointer;
-  color: var(--text-dim);
+  color: var(--text);
   font-size: 0.82rem;
   font-family: 'Source Serif 4', serif;
   text-align: left;
   border-left: 2px solid transparent;
   transition: color 0.15s, background 0.15s, border-color 0.15s;
 }
-.chapter-btn:hover { color: var(--text); background: rgba(255,255,255,0.03); }
+.chapter-btn:hover { color: var(--text-bright); background: rgba(255,255,255,0.04); }
 .chapter-btn.active {
   color: var(--gold2);
   border-left-color: var(--gold);
@@ -173,7 +173,7 @@ header {
 .chapter-btn .ch-count {
   margin-left: auto;
   font-size: 0.7rem;
-  opacity: 0.5;
+  color: var(--text-dim);
   flex-shrink: 0;
 }
 .chapter-btn .ch-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
@@ -289,7 +289,7 @@ header {
 .popup-subtitle {
   font-style: italic;
   font-size: 0.82rem;
-  color: var(--text-dim);
+  color: var(--text);
   margin-top: 3px;
 }
 
@@ -309,7 +309,7 @@ header {
   font-size: 0.6rem;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--text-dim);
+  color: var(--gold-dim);
   margin-bottom: 8px;
 }
 
@@ -317,7 +317,7 @@ header {
 .quest-desc {
   font-size: 0.88rem;
   line-height: 1.75;
-  color: var(--text);
+  color: var(--text-bright);
   word-break: break-word;
 }
 
@@ -335,13 +335,13 @@ header {
   gap: 8px;
   padding: 5px 10px;
   background: var(--bg3);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border2);
   border-radius: 5px;
   font-size: 0.82rem;
-  color: var(--text-dim);
+  color: var(--text);
 }
 .task-item .t-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.task-item .t-count { font-size: 0.74rem; color: var(--gold-dim); flex-shrink: 0; }
+.task-item .t-count { font-size: 0.74rem; color: var(--gold2); flex-shrink: 0; }
 
 /* Item stats badges */
 .task-item-wrap { display: flex; flex-direction: column; gap: 3px; }
@@ -360,10 +360,10 @@ header {
   display: flex; align-items: center; gap: 8px;
   padding: 4px 10px;
   background: var(--bg3);
-  border: 1px solid var(--border);
-  border-left: 2px solid rgba(255,200,60,0.4);
+  border: 1px solid var(--border2);
+  border-left: 2px solid rgba(255,200,60,0.5);
   border-radius: 5px;
-  font-size: 0.82rem; color: var(--text-dim);
+  font-size: 0.82rem; color: var(--text);
 }
 .reward-item .r-name { flex: 1; }
 .reward-xp-icon { width: 20px; text-align: center; flex-shrink: 0; }
@@ -371,24 +371,24 @@ header {
 /* Wiki link */
 .popup-wiki {
   position: absolute; top: 10px; right: 40px;
-  font-size: 1rem; text-decoration: none; opacity: 0.5;
+  font-size: 1rem; text-decoration: none; opacity: 0.6;
   transition: opacity 0.15s;
 }
 .popup-wiki:hover { opacity: 1; }
 .stat-badge {
   display: inline-flex; align-items: center; gap: 3px;
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.09);
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.12);
   border-radius: 4px; padding: 1px 6px;
-  font-size: 0.70rem; color: var(--text-dim);
+  font-size: 0.70rem; color: var(--text);
 }
-.stat-badge.dmg  { border-color: rgba(220,80,80,0.35);  color: #e89; }
-.stat-badge.arm  { border-color: rgba(80,140,220,0.35); color: #8ae; }
-.stat-badge.spd  { border-color: rgba(80,200,130,0.35); color: #7da; }
-.stat-badge.spec { border-color: rgba(200,160,60,0.35); color: #cc8; }
+.stat-badge.dmg  { border-color: rgba(220,80,80,0.5);  color: #f0a0a0; }
+.stat-badge.arm  { border-color: rgba(80,140,220,0.5); color: #90c0f0; }
+.stat-badge.spd  { border-color: rgba(80,200,130,0.5); color: #90d8b0; }
+.stat-badge.spec { border-color: rgba(200,160,60,0.5); color: #e0c070; }
 
 /* No desc */
-.no-desc { font-style: italic; font-size: 0.85rem; color: var(--text-dim); opacity: 0.6; }
+.no-desc { font-style: italic; font-size: 0.85rem; color: var(--text-dim); }
 
 /* ─── MINECRAFT TEXT COLORS ──────────────────────────────────────────── */
 .mc-0 { color: #111; }
@@ -428,14 +428,14 @@ header {
   box-shadow: 0 4px 16px rgba(0,0,0,0.5);
 }
 #tooltip .tt-title { color: var(--gold2); font-family: 'Cinzel', serif; font-size: 0.72rem; margin-bottom: 2px; }
-#tooltip .tt-sub { color: var(--text-dim); font-style: italic; }
+#tooltip .tt-sub { color: var(--text); font-style: italic; }
 
 /* ─── MOBILE ─────────────────────────────────────────────────────────── */
 .sidebar-toggle {
   display: none;
   background: none;
   border: none;
-  color: var(--text-dim);
+  color: var(--text);
   font-size: 1.2rem;
   cursor: pointer;
   padding: 4px 6px;
@@ -507,13 +507,13 @@ header {
   animation: spin 0.7s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
-.loading-text { font-family: 'Cinzel', serif; font-size: 0.8rem; color: var(--text-dim); letter-spacing: 0.1em; }
+.loading-text { font-family: 'Cinzel', serif; font-size: 0.8rem; color: var(--text); letter-spacing: 0.1em; }
 
 /* ─── SEARCH OVERLAY ────────────────────────────────────────────────── */
 #searchOverlay {
   position: absolute;
   inset: 0;
-  background: rgba(12,14,20,0.96);
+  background: rgba(20,24,36,0.97);
   z-index: 50;
   display: none;
   overflow-y: auto;
@@ -524,17 +524,17 @@ header {
   font-family: 'Cinzel', serif;
   font-size: 0.7rem;
   letter-spacing: 0.15em;
-  color: var(--text-dim);
+  color: var(--text);
   margin-bottom: 12px;
 }
 .search-group-title {
   font-size: 0.75rem;
-  color: var(--gold-dim);
+  color: var(--gold2);
   font-family: 'Cinzel', serif;
   letter-spacing: 0.06em;
   margin: 14px 0 6px;
   padding-bottom: 4px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--border2);
 }
 .search-result-item {
   padding: 8px 12px;
@@ -545,9 +545,75 @@ header {
 }
 .search-result-item:hover { background: var(--bg3); }
 .sri-title { font-size: 0.88rem; color: var(--text-bright); }
-.sri-desc { font-size: 0.77rem; color: var(--text-dim); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-mark { background: rgba(212,168,67,0.25); color: var(--gold2); border-radius: 2px; padding: 0 1px; }
-.no-results { text-align: center; color: var(--text-dim); font-style: italic; padding: 40px 0; }
+.sri-desc { font-size: 0.77rem; color: var(--text); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+mark { background: rgba(212,168,67,0.3); color: var(--gold2); border-radius: 2px; padding: 0 1px; }
+/* Sidebar tabs */
+.sidebar-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.stab {
+  flex: 1; padding: 9px 0;
+  background: none; border: none;
+  color: var(--text-dim); font-size: 0.82rem;
+  cursor: pointer; transition: color 0.15s;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.stab:hover { color: var(--text); }
+.stab.active { color: var(--gold2); border-bottom-color: var(--gold2); }
+
+/* Mod cards */
+.mod-card {
+  display: flex; align-items: center; gap: 9px;
+  padding: 7px 12px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background 0.1s;
+  margin-bottom: 1px;
+}
+.mod-card:hover { background: rgba(255,255,255,0.04); }
+.mod-card.active { background: rgba(212,168,67,0.08); }
+.mod-card-info { flex: 1; min-width: 0; }
+.mod-card-name { font-size: 0.84rem; color: var(--text-bright); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mod-card-sub  { font-size: 0.72rem; color: var(--text); margin-top: 1px; }
+.mod-card-count { font-size: 0.72rem; color: var(--gold2); flex-shrink: 0; }
+
+/* Mod detail (v mapArea) */
+#modView {
+  display: none;
+  flex-direction: column;
+  height: 100%;
+  overflow-y: auto;
+  padding: 20px;
+  box-sizing: border-box;
+}
+#modView::-webkit-scrollbar { width: 4px; }
+#modView::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+.mod-view-header {
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 20px;
+}
+.mod-view-title { font-size: 1.2rem; color: var(--text-bright); }
+.mod-view-meta  { font-size: 0.8rem; color: var(--text); margin-top: 2px; }
+.mod-chapter-section { margin-bottom: 24px; }
+.mod-chapter-title {
+  font-size: 0.78rem; color: var(--gold2);
+  text-transform: uppercase; letter-spacing: 0.06em;
+  margin-bottom: 8px; padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+.mod-quest-list { display: flex; flex-direction: column; gap: 4px; }
+.mod-quest-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 10px;
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 5px; cursor: pointer;
+  transition: border-color 0.1s, background 0.1s;
+  font-size: 0.82rem; color: var(--text);
+}
+.mod-quest-item:hover { background: var(--bg4); border-color: var(--border2); color: var(--text-bright); }
 </style>
 </head>
 <body>
@@ -578,6 +644,10 @@ mark { background: rgba(212,168,67,0.25); color: var(--gold2); border-radius: 2p
 
   <!-- Sidebar -->
   <div class="sidebar" id="sidebar">
+    <div class="sidebar-tabs">
+      <button class="stab active" id="stabChapters" onclick="switchSidebarTab('chapters')">Chapters</button>
+      <button class="stab" id="stabMods" onclick="switchSidebarTab('mods')">Mods</button>
+    </div>
     <div class="sidebar-inner" id="sidebarInner"></div>
   </div>
 
@@ -588,6 +658,9 @@ mark { background: rgba(212,168,67,0.25); color: var(--gold2); border-radius: 2p
       <div class="big">📜</div>
       <p>Choose a chapter from the sidebar</p>
     </div>
+
+    <!-- Mod detail view -->
+    <div id="modView"></div>
     <div class="map-controls">
       <button class="map-btn" id="btnZoomIn" title="Zoom in">+</button>
       <button class="map-btn" id="btnZoomOut" title="Zoom out">−</button>
@@ -1197,6 +1270,196 @@ async function loadData() {
 }
 
 // ─── SIDEBAR ──────────────────────────────────────────────────────────────────
+// ─── MOD INDEX ────────────────────────────────────────────────────────────────
+let MOD_INDEX = null;  // ns → { name, quests: [{q, chapter}], topItem }
+
+// Hezké názvy pro známé namespace
+const MOD_NAMES = {
+  ae2: 'Applied Energistics 2', ars_nouveau: 'Ars Nouveau',
+  botania: 'Botania', cataclysm: 'Cataclysm',
+  create: 'Create', draconicevolution: 'Draconic Evolution',
+  evilcraft: 'EvilCraft', eternal_starlight: 'Eternal Starlight',
+  forbidden_arcanus: 'Forbidden & Arcanus', immersiveengineering: 'Immersive Engineering',
+  industrialforegoing: 'Industrial Foregoing', irons_spellbooks: "Iron's Spells 'n Spellbooks",
+  justdirethings: 'Just Dire Things', mahou_tsukai: 'Mahou Tsukai',
+  mekanism: 'Mekanism', modern_industrialization: 'Modern Industrialization',
+  mysticalagriculture: 'Mystical Agriculture', occultism: 'Occultism',
+  pneumaticcraft: 'PneumaticCraft', powah: 'Powah',
+  productivebees: 'Productive Bees', productivetrees: 'Productive Trees',
+  refinedstorage: 'Refined Storage', relics: 'Relics',
+  tconstruct: "Tinkers' Construct", twilightforest: 'Twilight Forest',
+  undergarden: 'The Undergarden', xycraftworld: 'XyCraft',
+  railcraft: 'Railcraft', naturesaura: "Nature's Aura",
+  apotheosis: 'Apotheosis', silentgear: 'Silent Gear',
+  allthemodium: 'Allthemodium', iceandfire: 'Ice & Fire',
+  artifacts: 'Artifacts', integratedynamics: 'Integrated Dynamics',
+  oritech: 'Oritech', pylons: 'Pylons',
+};
+
+const SKIP_NS = new Set(['minecraft', 'ftbfiltersystem', 'ftbquests', 'forge', 'neoforge', 'c']);
+
+function buildModIndex() {
+  if (MOD_INDEX) return MOD_INDEX;
+  MOD_INDEX = {};
+
+  for (const ch of DATA.chapters) {
+    for (const q of ch.quests) {
+      const nsItems = {};  // ns → first item id
+      for (const t of (q.tasks || [])) {
+        for (const field of ['item', 'entity']) {
+          if (!t[field]) continue;
+          const ns = t[field].split(':')[0];
+          if (SKIP_NS.has(ns)) continue;
+          if (!nsItems[ns]) nsItems[ns] = t[field];
+        }
+      }
+      for (const [ns, itemId] of Object.entries(nsItems)) {
+        if (!MOD_INDEX[ns]) {
+          MOD_INDEX[ns] = {
+            ns,
+            name: MOD_NAMES[ns] || ns.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+            quests: [],
+            itemCounts: {},
+            topItem: null,
+          };
+        }
+        MOD_INDEX[ns].quests.push({ q, chapter: ch });
+        MOD_INDEX[ns].itemCounts[itemId] = (MOD_INDEX[ns].itemCounts[itemId] || 0) + 1;
+      }
+    }
+  }
+
+  // Najdi nejčastější item jako ikonu modu
+  for (const mod of Object.values(MOD_INDEX)) {
+    mod.topItem = Object.entries(mod.itemCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || null;
+    delete mod.itemCounts;
+  }
+
+  return MOD_INDEX;
+}
+
+// ─── SIDEBAR TABS ─────────────────────────────────────────────────────────────
+let sidebarTab = 'chapters';
+
+function switchSidebarTab(tab) {
+  sidebarTab = tab;
+  document.getElementById('stabChapters').classList.toggle('active', tab === 'chapters');
+  document.getElementById('stabMods').classList.toggle('active', tab === 'mods');
+  if (tab === 'chapters') {
+    buildSidebar();
+    // Pokud byl zobrazený mod view, vrať mapu
+    showMapView();
+  } else {
+    buildModSidebar();
+  }
+}
+
+function buildModSidebar() {
+  const el = document.getElementById('sidebarInner');
+  const index = buildModIndex();
+  const sorted = Object.values(index).sort((a, b) => b.quests.length - a.quests.length);
+
+  let html = '';
+  for (const mod of sorted) {
+    const icon = mod.topItem ? itemIcon(mod.topItem, '📦', 18) : '<span style="width:18px;display:inline-block"></span>';
+    const chapters = [...new Set(mod.quests.map(e => stripMc(e.chapter.title)))];
+    const chapStr = chapters.slice(0, 2).join(', ') + (chapters.length > 2 ? ` +${chapters.length - 2}` : '');
+    html += `<div class="mod-card" data-ns="${escHtml(mod.ns)}" onclick="selectMod('${escHtml(mod.ns)}')">
+      ${icon}
+      <div class="mod-card-info">
+        <div class="mod-card-name">${escHtml(mod.name)}</div>
+        <div class="mod-card-sub">${escHtml(chapStr)}</div>
+      </div>
+      <span class="mod-card-count">${mod.quests.length}</span>
+    </div>`;
+  }
+  el.innerHTML = html;
+}
+
+// ─── MOD DETAIL VIEW ─────────────────────────────────────────────────────────
+let activeModNs = null;
+
+function selectMod(ns) {
+  activeModNs = ns;
+  const mod = buildModIndex()[ns];
+  if (!mod) return;
+
+  // Zvýrazni aktivní mod v sidebaru
+  document.querySelectorAll('.mod-card').forEach(c => c.classList.toggle('active', c.dataset.ns === ns));
+
+  // Seskup questy podle kapitoly (zachovej pořadí kapitol)
+  const byChapter = new Map();
+  for (const { q, chapter } of mod.quests) {
+    const cid = chapter.id;
+    if (!byChapter.has(cid)) byChapter.set(cid, { chapter, quests: [] });
+    byChapter.get(cid).quests.push(q);
+  }
+
+  const icon = mod.topItem ? itemIcon(mod.topItem, '📦', 32) : '';
+  let html = `
+    <div class="mod-view-header">
+      ${icon}
+      <div>
+        <div class="mod-view-title">${escHtml(mod.name)}</div>
+        <div class="mod-view-meta">${mod.quests.length} quests · ${byChapter.size} chapter${byChapter.size !== 1 ? 's' : ''}</div>
+      </div>
+    </div>`;
+
+  for (const { chapter, quests } of byChapter.values()) {
+    html += `<div class="mod-chapter-section">
+      <div class="mod-chapter-title">${escHtml(stripMc(chapter.title))}</div>
+      <div class="mod-quest-list">`;
+    for (const q of quests) {
+      const qicon = itemIcon(getQuestIconId(q)?.id || '', '', 18);
+      html += `<div class="mod-quest-item" onclick="openModQuest('${escHtml(chapter.id)}','${escHtml(q.id)}')">
+        ${qicon}
+        <span>${escHtml(stripMc(q.title || ''))}</span>
+      </div>`;
+    }
+    html += `</div></div>`;
+  }
+
+  const modView = document.getElementById('modView');
+  modView.innerHTML = html;
+  modView.style.display = 'flex';
+  modView.style.flexDirection = 'column';
+
+  // Skryj mapu
+  document.getElementById('mapCanvas').style.display = 'none';
+  document.getElementById('emptyState').style.display = 'none';
+  document.getElementById('mapControls')?.style && (document.querySelector('.map-controls').style.display = 'none');
+}
+
+function openModQuest(chapterId, questId) {
+  // Přepni na chapter tab, vyber kapitolu a otevři quest popup
+  switchSidebarTab('chapters');
+  selectChapter(chapterId);
+  // Počkej na vykreslení a otevři popup
+  setTimeout(() => {
+    const chapter = DATA.chapters.find(c => c.id === chapterId);
+    const q = chapter?.quests.find(q => q.id === questId);
+    if (q) {
+      selectedQuestId = questId;
+      const area = document.getElementById('mapArea');
+      openPopup(q, area.clientWidth / 2, area.clientHeight / 2);
+      requestDraw();
+    }
+  }, 100);
+}
+
+function showMapView() {
+  document.getElementById('modView').style.display = 'none';
+  document.getElementById('mapCanvas').style.display = '';
+  document.querySelector('.map-controls').style.display = '';
+  if (activeChapter) {
+    document.getElementById('emptyState').style.display = 'none';
+  } else {
+    document.getElementById('emptyState').style.display = '';
+  }
+  activeModNs = null;
+  document.querySelectorAll('.mod-card').forEach(c => c.classList.remove('active'));
+}
+
 function buildSidebar() {
   const el = document.getElementById('sidebarInner');
   // Group chapters by group_title
