@@ -1921,7 +1921,9 @@ canvas.addEventListener('wheel', e => {
 let lastTouchDist = 0, lastTouchMidX = 0, lastTouchMidY = 0;
 let isPinching = false, touchMoved = false;
 let longPressTimer = null;
+let longPressActivated = false;
 const LONG_PRESS_MS = 450;
+const LONG_PRESS_SLOP = 10;  // px — kolik pohybu tolerujeme při long pressu
 canvas.addEventListener('touchstart', e => {
   e.preventDefault();
   if (e.touches.length === 2) {
@@ -1936,6 +1938,7 @@ canvas.addEventListener('touchstart', e => {
   } else if (e.touches.length === 1 && !isPinching) {
     isDragging = true;
     touchMoved = false;
+    longPressActivated = false;
     dragStartX = e.touches[0].clientX; dragStartY = e.touches[0].clientY;
     vpXStart = vpX; vpYStart = vpY;
 
@@ -1949,13 +1952,13 @@ canvas.addEventListener('touchstart', e => {
       const sy = touch.clientY - rect.top;
       const q = getQuestAtScreen(sx, sy);
       if (!q) return;
+      longPressActivated = true;
       // Přepni: pokud je quest už vybraný, odeber, jinak vyber
       if (selectedQuestId === q.id) {
         selectedQuestId = null;
       } else {
         selectedQuestId = q.id;
         closePopup();
-        // Haptic feedback pokud podporovaný
         if (navigator.vibrate) navigator.vibrate(30);
       }
       requestDraw();
@@ -1983,7 +1986,7 @@ canvas.addEventListener('touchmove', e => {
   } else if (e.touches.length === 1 && isDragging && !isPinching) {
     const dx = e.touches[0].clientX - dragStartX;
     const dy = e.touches[0].clientY - dragStartY;
-    if (Math.hypot(dx, dy) > 4) {
+    if (Math.hypot(dx, dy) > LONG_PRESS_SLOP) {
       touchMoved = true;
       clearTimeout(longPressTimer); longPressTimer = null;
     }
@@ -2006,8 +2009,8 @@ canvas.addEventListener('touchend', e => {
     isPinching = false;
     if (wasPinching || !isDragging) { isDragging = false; return; }
     isDragging = false;
-    // Tap jen pokud se prst nepohnul
-    if (touchMoved) return;
+    // Přeskoč tap pokud proběhl long press nebo prst se pohnul
+    if (longPressActivated || touchMoved) { longPressActivated = false; return; }
     const touch = e.changedTouches[0];
     const rect = canvas.getBoundingClientRect();
     const sx = touch.clientX - rect.left;
@@ -2021,6 +2024,7 @@ canvas.addEventListener('touchcancel', () => {
   isDragging = false;
   isPinching = false;
   touchMoved = false;
+  longPressActivated = false;
   clearTimeout(longPressTimer); longPressTimer = null;
 });
 
