@@ -1870,7 +1870,11 @@ function getQuestAtScreen(sx, sy) {
   return null;
 }
 
+// Příznak že poslední interakce byla touch — blokuje ghost mousedown/click po touchend
+let lastWasTouch = false;
+
 canvas.addEventListener('mousedown', e => {
+  if (lastWasTouch) { lastWasTouch = false; return; }
   const q = getQuestAtScreen(e.offsetX, e.offsetY);
   if (q) {
     selectQuest(q, e.offsetX, e.offsetY);
@@ -1926,6 +1930,7 @@ const LONG_PRESS_MS = 450;
 const LONG_PRESS_SLOP = 10;  // px — kolik pohybu tolerujeme při long pressu
 canvas.addEventListener('touchstart', e => {
   e.preventDefault();
+  lastWasTouch = true;
   if (e.touches.length === 2) {
     // Pinch start — zruš případný drag a označ že probíhá pinch
     isDragging = false;
@@ -1953,12 +1958,15 @@ canvas.addEventListener('touchstart', e => {
       const q = getQuestAtScreen(sx, sy);
       if (!q) return;
       longPressActivated = true;
-      // Přepni: pokud je quest už vybraný, odeber, jinak vyber
+      // Přepni highlight
       if (selectedQuestId === q.id) {
         selectedQuestId = null;
       } else {
         selectedQuestId = q.id;
-        closePopup();
+        // Skryj popup bez resetu selectedQuestId
+        popup.classList.remove('open');
+        popup.style.display = 'none';
+        popupBackdrop.classList.remove('open');
         if (navigator.vibrate) navigator.vibrate(30);
       }
       requestDraw();
