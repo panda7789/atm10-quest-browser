@@ -195,6 +195,7 @@ header {
   width: 100%;
   height: 100%;
   cursor: grab;
+  touch-action: none;  /* zabrání prohlížeči scrollovat/zoomovat — vše řídíme sami */
 }
 #mapCanvas.grabbing { cursor: grabbing; }
 #mapCanvas.hovering { cursor: pointer; }
@@ -718,7 +719,7 @@ const MIN_SCALE = 15, MAX_SCALE = 140;
 let depsMode = 'hover';  // default — méně nepřehledné
 
 // Drag state
-let isDragging = false, dragStartX = 0, dragStartY = 0, vpXStart = 0, vpYStart = 0;
+let isDragging = false, dragStartX = 0, dragStartY = 0;
 let hoveredQuestId = null;
 
 // Canvas
@@ -1881,89 +1882,46 @@ function getQuestAtScreen(sx, sy) {
   return null;
 }
 
-// Příznak že poslední interakce byla touch — blokuje ghost mousedown/click po touchend
-let lastWasTouch = false;
+// ─── TOUCH / POINTER HANDLING ────────────────────────────────────────────────
+// touch-action: none na canvasu zajišťuje že prohlížeč neinterferuje
+// Vše řídíme přes Pointer Events — funguje na myši i mobilu konzistentně
 
-canvas.addEventListener('mousedown', e => {
-  if (lastWasTouch) { lastWasTouch = false; return; }
-  // Handled by pointerdown
-});
+const activePointers = new Map();  // pointerId → {x, y}
 
-canvas.addEventListener('mousemove', e => {
-  // Hover handled by pointermove
-});
-
-// mouseup/mouseleave handled by pointerup/pointerleave
-
-canvas.addEventListener('wheel', e => {
-  e.preventDefault();
-  const factor = e.deltaY < 0 ? 1.12 : 0.89;
-  const mx = e.offsetX, my = e.offsetY;
-  const [wx, wy] = screenToWorld(mx, my);
-  vpScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, vpScale * factor));
-  vpX = mx - wx * vpScale;
-  vpY = my - wy * vpScale;
-  requestDraw();
-}, { passive: false });
-
-// Touch — pinch zoom pomocí touch eventů (pointer eventy pinch nepodporují dobře)
-let lastTouchDist = 0;
-let isPinching = false;
-
-canvas.addEventListener('touchstart', e => {
-  if (e.touches.length === 2) {
-    e.preventDefault();
-    isPinching = true;
-    clearTimeout(longPressTimer); longPressTimer = null;
-    const t0 = e.touches[0], t1 = e.touches[1];
-    lastTouchDist = Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY);
-  }
-}, { passive: false });
-
-canvas.addEventListener('touchmove', e => {
-  if (e.touches.length === 2) {
-    e.preventDefault();
-    isPinching = true;
-    clearTimeout(longPressTimer); longPressTimer = null;
-    const t0 = e.touches[0], t1 = e.touches[1];
-    const dist = Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY);
-    const midX = (t0.clientX + t1.clientX) / 2;
-    const midY = (t0.clientY + t1.clientY) / 2;
-    const rect = canvas.getBoundingClientRect();
-    const [wx, wy] = screenToWorld(midX - rect.left, midY - rect.top);
-    vpScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, vpScale * (dist / lastTouchDist)));
-    vpX = (midX - rect.left) - wx * vpScale;
-    vpY = (midY - rect.top) - wy * vpScale;
-    lastTouchDist = dist;
-    requestDraw();
-  }
-}, { passive: false });
-
-canvas.addEventListener('touchend', e => {
-  if (e.touches.length < 2) {
-    // Krátká ochrana po pinchem — pointer eventy ignorujeme dalších 300ms
-    if (isPinching) {
-      isPinching = false;
-      pointerBlocked = true;
-      setTimeout(() => { pointerBlocked = false; }, 300);
-    }
-  }
-}, { passive: true });
-
-// Pointer eventy — drag + long press + tap (myš i touch, kromě pinchem)
-let pointerBlocked = false;
 let longPressTimer = null;
 let longPressActivated = false;
 const LONG_PRESS_MS = 500;
-const SLOP = 8;  // px pohybu který ruší long press
+const SLOP = 8;
 
 let ptDown = false, ptMoved = false;
 let ptStartX = 0, ptStartY = 0;
-let ptId = null;  // pointerId
+let ptId = null;
+let vpXStart = 0, vpYStart = 0;
+let isPinching = false;
+let pinchStartDist = 0, pinchStartScale = 0, pinchStartMidX = 0, pinchStartMidY = 0;
+let pinchStartWx = 0, pinchStartWy = 0;
 
 canvas.addEventListener('pointerdown', e => {
-  if (pointerBlocked || isPinching) return;
-  if (e.pointerType === 'touch' && e.isPrimary === false) return;
+  activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+  if (activePointers.size === 2) {
+    // Přechod na pinch — zruš drag/long press
+    isPinching = true;
+    ptDown = false;
+    clearTimeout(longPressTimer); longPressTimer = null;
+    const pts = [...activePointers.values()];
+    pinchStartDist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
+    pinchStartScale = vpScale;
+    const rect = canvas.getBoundingClientRect();
+    pinchStartMidX = (pts[0].x + pts[1].x) / 2 - rect.left;
+    pinchStartMidY = (pts[0].y + pts[1].y) / 2 - rect.top;
+    [pinchStartWx, pinchStartWy] = screenToWorld(pinchStartMidX, pinchStartMidY);
+    return;
+  }
+
+  if (activePointers.size > 2 || isPinching) return;
+
+  // Jeden prst / myš
   ptDown = true;
   ptMoved = false;
   longPressActivated = false;
@@ -1988,6 +1946,19 @@ canvas.addEventListener('pointerdown', e => {
 });
 
 window.addEventListener('pointermove', e => {
+  if (!activePointers.has(e.pointerId)) return;
+  activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+  if (isPinching && activePointers.size === 2) {
+    const pts = [...activePointers.values()];
+    const dist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
+    vpScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, pinchStartScale * (dist / pinchStartDist)));
+    vpX = pinchStartMidX - pinchStartWx * vpScale;
+    vpY = pinchStartMidY - pinchStartWy * vpScale;
+    requestDraw();
+    return;
+  }
+
   if (!ptDown || e.pointerId !== ptId) return;
   const dx = e.clientX - ptStartX;
   const dy = e.clientY - ptStartY;
@@ -2000,11 +1971,10 @@ window.addEventListener('pointermove', e => {
     vpY = vpYStart + dy;
     requestDraw();
   }
-  if (e.pointerType === 'mouse' && e.target === canvas) {
+  // Hover tooltip — jen myš
+  if (e.pointerType === 'mouse') {
     const rect = canvas.getBoundingClientRect();
-    const ox = e.clientX - rect.left;
-    const oy = e.clientY - rect.top;
-    const q = getQuestAtScreen(ox, oy);
+    const q = getQuestAtScreen(e.clientX - rect.left, e.clientY - rect.top);
     const newId = q ? q.id : null;
     if (newId !== hoveredQuestId) {
       hoveredQuestId = newId;
@@ -2017,32 +1987,34 @@ window.addEventListener('pointermove', e => {
 });
 
 window.addEventListener('pointerup', e => {
+  activePointers.delete(e.pointerId);
+  if (activePointers.size < 2) isPinching = false;
+
   if (!ptDown || e.pointerId !== ptId) return;
   clearTimeout(longPressTimer); longPressTimer = null;
   ptDown = false;
   canvas.classList.remove('grabbing');
   if (longPressActivated) { longPressActivated = false; return; }
-  if (ptMoved || isPinching || pointerBlocked) return;
+  if (ptMoved) return;
   const rect = canvas.getBoundingClientRect();
-  const ox = e.clientX - rect.left;
-  const oy = e.clientY - rect.top;
-  const q = getQuestAtScreen(ox, oy);
-  if (q) selectQuest(q, ox, oy);
+  const q = getQuestAtScreen(e.clientX - rect.left, e.clientY - rect.top);
+  if (q) selectQuest(q, e.clientX - rect.left, e.clientY - rect.top);
 });
 
-canvas.addEventListener('pointercancel', e => {
-  if (e.pointerId !== ptId) return;
-  ptDown = false;
-  longPressActivated = false;
-  clearTimeout(longPressTimer); longPressTimer = null;
+window.addEventListener('pointercancel', e => {
+  activePointers.delete(e.pointerId);
+  if (activePointers.size < 2) isPinching = false;
+  if (e.pointerId === ptId) {
+    ptDown = false;
+    longPressActivated = false;
+    clearTimeout(longPressTimer); longPressTimer = null;
+  }
 });
 
 canvas.addEventListener('pointerleave', e => {
   if (e.pointerType === 'mouse') {
-    if (ptDown) { ptDown = false; canvas.classList.remove('grabbing'); }
     hideTooltip();
-    hoveredQuestId = null;
-    requestDraw();
+    if (hoveredQuestId) { hoveredQuestId = null; requestDraw(); }
   }
 });
 
