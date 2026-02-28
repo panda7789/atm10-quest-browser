@@ -1963,18 +1963,14 @@ let ptId = null;  // pointerId
 
 canvas.addEventListener('pointerdown', e => {
   if (pointerBlocked || isPinching) return;
-  if (e.pointerType === 'touch' && e.isPrimary === false) return;  // druhý prst — ignoruj
+  if (e.pointerType === 'touch' && e.isPrimary === false) return;
   ptDown = true;
   ptMoved = false;
   longPressActivated = false;
   ptId = e.pointerId;
   ptStartX = e.clientX; ptStartY = e.clientY;
-  dragStartX = e.clientX; dragStartY = e.clientY;
   vpXStart = vpX; vpYStart = vpY;
-  canvas.setPointerCapture(e.pointerId);
 
-  // Zkus najít quest — ale neotvírej popup hned, počkej na pointerup
-  // Long press timer
   const capturedX = e.offsetX, capturedY = e.offsetY;
   longPressTimer = setTimeout(() => {
     longPressTimer = null;
@@ -1984,7 +1980,6 @@ canvas.addEventListener('pointerdown', e => {
     longPressActivated = true;
     selectedQuestId = (selectedQuestId === q.id) ? null : q.id;
     if (selectedQuestId && navigator.vibrate) navigator.vibrate(30);
-    // Skryj popup pokud byl otevřený
     popup.classList.remove('open');
     popup.style.display = 'none';
     popupBackdrop.classList.remove('open');
@@ -1992,22 +1987,24 @@ canvas.addEventListener('pointerdown', e => {
   }, LONG_PRESS_MS);
 });
 
-canvas.addEventListener('pointermove', e => {
+window.addEventListener('pointermove', e => {
   if (!ptDown || e.pointerId !== ptId) return;
-  const dx = e.clientX - dragStartX;
-  const dy = e.clientY - dragStartY;
+  const dx = e.clientX - ptStartX;
+  const dy = e.clientY - ptStartY;
   if (!ptMoved && Math.hypot(dx, dy) > SLOP) {
     ptMoved = true;
     clearTimeout(longPressTimer); longPressTimer = null;
   }
   if (ptMoved) {
-    vpX = vpXStart + (e.clientX - ptStartX);
-    vpY = vpYStart + (e.clientY - ptStartY);
+    vpX = vpXStart + dx;
+    vpY = vpYStart + dy;
     requestDraw();
   }
-  // Hover tooltip (jen myš)
-  if (e.pointerType === 'mouse') {
-    const q = getQuestAtScreen(e.offsetX, e.offsetY);
+  if (e.pointerType === 'mouse' && e.target === canvas) {
+    const rect = canvas.getBoundingClientRect();
+    const ox = e.clientX - rect.left;
+    const oy = e.clientY - rect.top;
+    const q = getQuestAtScreen(ox, oy);
     const newId = q ? q.id : null;
     if (newId !== hoveredQuestId) {
       hoveredQuestId = newId;
@@ -2019,19 +2016,18 @@ canvas.addEventListener('pointermove', e => {
   }
 });
 
-canvas.addEventListener('pointerup', e => {
+window.addEventListener('pointerup', e => {
   if (!ptDown || e.pointerId !== ptId) return;
   clearTimeout(longPressTimer); longPressTimer = null;
   ptDown = false;
   canvas.classList.remove('grabbing');
-
   if (longPressActivated) { longPressActivated = false; return; }
-  if (ptMoved) return;
-  if (isPinching || pointerBlocked) return;
-
-  // Tap / click — otevři quest
-  const q = getQuestAtScreen(e.offsetX, e.offsetY);
-  if (q) selectQuest(q, e.offsetX, e.offsetY);
+  if (ptMoved || isPinching || pointerBlocked) return;
+  const rect = canvas.getBoundingClientRect();
+  const ox = e.clientX - rect.left;
+  const oy = e.clientY - rect.top;
+  const q = getQuestAtScreen(ox, oy);
+  if (q) selectQuest(q, ox, oy);
 });
 
 canvas.addEventListener('pointercancel', e => {
