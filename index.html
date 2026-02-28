@@ -368,13 +368,24 @@ header {
 .reward-item .r-name { flex: 1; }
 .reward-xp-icon { width: 20px; text-align: center; flex-shrink: 0; }
 
-/* Wiki link */
-.popup-wiki {
+/* Wiki link + deps button */
+.popup-header-btns {
   position: absolute; top: 10px; right: 40px;
+  display: flex; gap: 4px; align-items: center;
+}
+.popup-wiki {
   font-size: 1rem; text-decoration: none; opacity: 0.6;
-  transition: opacity 0.15s;
+  transition: opacity 0.15s; padding: 2px;
 }
 .popup-wiki:hover { opacity: 1; }
+.popup-deps-btn {
+  background: none; border: none; cursor: pointer;
+  font-size: 1rem; opacity: 0.6; padding: 2px;
+  transition: opacity 0.15s, color 0.15s;
+  line-height: 1;
+}
+.popup-deps-btn:hover { opacity: 1; }
+.popup-deps-btn.active { opacity: 1; filter: sepia(1) saturate(3) hue-rotate(10deg); }
 .stat-badge {
   display: inline-flex; align-items: center; gap: 3px;
   background: rgba(255,255,255,0.06);
@@ -1875,40 +1886,14 @@ let lastWasTouch = false;
 
 canvas.addEventListener('mousedown', e => {
   if (lastWasTouch) { lastWasTouch = false; return; }
-  const q = getQuestAtScreen(e.offsetX, e.offsetY);
-  if (q) {
-    selectQuest(q, e.offsetX, e.offsetY);
-    return;
-  }
-  isDragging = true;
-  dragStartX = e.clientX; dragStartY = e.clientY;
-  vpXStart = vpX; vpYStart = vpY;
-  canvas.classList.add('grabbing');
+  // Handled by pointerdown
 });
 
 canvas.addEventListener('mousemove', e => {
-  if (isDragging) {
-    vpX = vpXStart + (e.clientX - dragStartX);
-    vpY = vpYStart + (e.clientY - dragStartY);
-    requestDraw();
-    return;
-  }
-  const q = getQuestAtScreen(e.offsetX, e.offsetY);
-  const newId = q ? q.id : null;
-  if (newId !== hoveredQuestId) {
-    hoveredQuestId = newId;
-    canvas.classList.toggle('hovering', !!newId);
-    requestDraw();
-  }
-  if (q) {
-    showTooltip(e.clientX, e.clientY, q);
-  } else {
-    hideTooltip();
-  }
+  // Hover handled by pointermove
 });
 
-canvas.addEventListener('mouseup', () => { isDragging = false; canvas.classList.remove('grabbing'); });
-canvas.addEventListener('mouseleave', () => { isDragging = false; canvas.classList.remove('grabbing'); hideTooltip(); });
+// mouseup/mouseleave handled by pointerup/pointerleave
 
 canvas.addEventListener('wheel', e => {
   e.preventDefault();
@@ -1921,64 +1906,24 @@ canvas.addEventListener('wheel', e => {
   requestDraw();
 }, { passive: false });
 
-// Touch
-let lastTouchDist = 0, lastTouchMidX = 0, lastTouchMidY = 0;
-let isPinching = false, touchMoved = false;
-let longPressTimer = null;
-let longPressActivated = false;
-const LONG_PRESS_MS = 450;
-const LONG_PRESS_SLOP = 10;  // px — kolik pohybu tolerujeme při long pressu
+// Touch — pinch zoom pomocí touch eventů (pointer eventy pinch nepodporují dobře)
+let lastTouchDist = 0;
+let isPinching = false;
+
 canvas.addEventListener('touchstart', e => {
-  e.preventDefault();
-  lastWasTouch = true;
   if (e.touches.length === 2) {
-    // Pinch start — zruš případný drag a označ že probíhá pinch
-    isDragging = false;
+    e.preventDefault();
     isPinching = true;
     clearTimeout(longPressTimer); longPressTimer = null;
     const t0 = e.touches[0], t1 = e.touches[1];
     lastTouchDist = Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY);
-    lastTouchMidX = (t0.clientX + t1.clientX) / 2;
-    lastTouchMidY = (t0.clientY + t1.clientY) / 2;
-  } else if (e.touches.length === 1 && !isPinching) {
-    isDragging = true;
-    touchMoved = false;
-    longPressActivated = false;
-    dragStartX = e.touches[0].clientX; dragStartY = e.touches[0].clientY;
-    vpXStart = vpX; vpYStart = vpY;
-
-    // Long press — zvýrazni relace bez otevření popupu
-    const touch = e.touches[0];
-    longPressTimer = setTimeout(() => {
-      longPressTimer = null;
-      if (touchMoved) return;
-      const rect = canvas.getBoundingClientRect();
-      const sx = touch.clientX - rect.left;
-      const sy = touch.clientY - rect.top;
-      const q = getQuestAtScreen(sx, sy);
-      if (!q) return;
-      longPressActivated = true;
-      // Přepni highlight
-      if (selectedQuestId === q.id) {
-        selectedQuestId = null;
-      } else {
-        selectedQuestId = q.id;
-        // Skryj popup bez resetu selectedQuestId
-        popup.classList.remove('open');
-        popup.style.display = 'none';
-        popupBackdrop.classList.remove('open');
-        if (navigator.vibrate) navigator.vibrate(30);
-      }
-      requestDraw();
-    }, LONG_PRESS_MS);
   }
 }, { passive: false });
 
 canvas.addEventListener('touchmove', e => {
-  e.preventDefault();
   if (e.touches.length === 2) {
+    e.preventDefault();
     isPinching = true;
-    isDragging = false;
     clearTimeout(longPressTimer); longPressTimer = null;
     const t0 = e.touches[0], t1 = e.touches[1];
     const dist = Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY);
@@ -1991,49 +1936,118 @@ canvas.addEventListener('touchmove', e => {
     vpY = (midY - rect.top) - wy * vpScale;
     lastTouchDist = dist;
     requestDraw();
-  } else if (e.touches.length === 1 && isDragging && !isPinching) {
-    const dx = e.touches[0].clientX - dragStartX;
-    const dy = e.touches[0].clientY - dragStartY;
-    if (Math.hypot(dx, dy) > LONG_PRESS_SLOP) {
-      touchMoved = true;
-      clearTimeout(longPressTimer); longPressTimer = null;
-    }
-    vpX = vpXStart + dx;
-    vpY = vpYStart + dy;
-    requestDraw();
   }
 }, { passive: false });
 
 canvas.addEventListener('touchend', e => {
-  clearTimeout(longPressTimer); longPressTimer = null;
-  if (e.touches.length === 1 && isPinching) {
-    // Přechod z pinchem na jeden prst — resetuj drag aby nedošlo k tappnutí
-    isPinching = false;
-    isDragging = false;
-    return;
+  if (e.touches.length < 2) {
+    // Krátká ochrana po pinchem — pointer eventy ignorujeme dalších 300ms
+    if (isPinching) {
+      isPinching = false;
+      pointerBlocked = true;
+      setTimeout(() => { pointerBlocked = false; }, 300);
+    }
   }
-  if (e.touches.length === 0) {
-    const wasPinching = isPinching;
-    isPinching = false;
-    if (wasPinching || !isDragging) { isDragging = false; return; }
-    isDragging = false;
-    // Přeskoč tap pokud proběhl long press nebo prst se pohnul
-    if (longPressActivated || touchMoved) { longPressActivated = false; return; }
-    const touch = e.changedTouches[0];
-    const rect = canvas.getBoundingClientRect();
-    const sx = touch.clientX - rect.left;
-    const sy = touch.clientY - rect.top;
-    const q = getQuestAtScreen(sx, sy);
-    if (q) selectQuest(q, sx, sy);
-  }
-}, { passive: false });
+}, { passive: true });
 
-canvas.addEventListener('touchcancel', () => {
-  isDragging = false;
-  isPinching = false;
-  touchMoved = false;
+// Pointer eventy — drag + long press + tap (myš i touch, kromě pinchem)
+let pointerBlocked = false;
+let longPressTimer = null;
+let longPressActivated = false;
+const LONG_PRESS_MS = 500;
+const SLOP = 8;  // px pohybu který ruší long press
+
+let ptDown = false, ptMoved = false;
+let ptStartX = 0, ptStartY = 0;
+let ptId = null;  // pointerId
+
+canvas.addEventListener('pointerdown', e => {
+  if (pointerBlocked || isPinching) return;
+  if (e.pointerType === 'touch' && e.isPrimary === false) return;  // druhý prst — ignoruj
+  ptDown = true;
+  ptMoved = false;
+  longPressActivated = false;
+  ptId = e.pointerId;
+  ptStartX = e.clientX; ptStartY = e.clientY;
+  dragStartX = e.clientX; dragStartY = e.clientY;
+  vpXStart = vpX; vpYStart = vpY;
+  canvas.setPointerCapture(e.pointerId);
+
+  // Zkus najít quest — ale neotvírej popup hned, počkej na pointerup
+  // Long press timer
+  const capturedX = e.offsetX, capturedY = e.offsetY;
+  longPressTimer = setTimeout(() => {
+    longPressTimer = null;
+    if (ptMoved) return;
+    const q = getQuestAtScreen(capturedX, capturedY);
+    if (!q) return;
+    longPressActivated = true;
+    selectedQuestId = (selectedQuestId === q.id) ? null : q.id;
+    if (selectedQuestId && navigator.vibrate) navigator.vibrate(30);
+    // Skryj popup pokud byl otevřený
+    popup.classList.remove('open');
+    popup.style.display = 'none';
+    popupBackdrop.classList.remove('open');
+    requestDraw();
+  }, LONG_PRESS_MS);
+});
+
+canvas.addEventListener('pointermove', e => {
+  if (!ptDown || e.pointerId !== ptId) return;
+  const dx = e.clientX - dragStartX;
+  const dy = e.clientY - dragStartY;
+  if (!ptMoved && Math.hypot(dx, dy) > SLOP) {
+    ptMoved = true;
+    clearTimeout(longPressTimer); longPressTimer = null;
+  }
+  if (ptMoved) {
+    vpX = vpXStart + (e.clientX - ptStartX);
+    vpY = vpYStart + (e.clientY - ptStartY);
+    requestDraw();
+  }
+  // Hover tooltip (jen myš)
+  if (e.pointerType === 'mouse') {
+    const q = getQuestAtScreen(e.offsetX, e.offsetY);
+    const newId = q ? q.id : null;
+    if (newId !== hoveredQuestId) {
+      hoveredQuestId = newId;
+      canvas.classList.toggle('hovering', !!newId);
+      requestDraw();
+    }
+    if (q) showTooltip(e.clientX, e.clientY, q);
+    else hideTooltip();
+  }
+});
+
+canvas.addEventListener('pointerup', e => {
+  if (!ptDown || e.pointerId !== ptId) return;
+  clearTimeout(longPressTimer); longPressTimer = null;
+  ptDown = false;
+  canvas.classList.remove('grabbing');
+
+  if (longPressActivated) { longPressActivated = false; return; }
+  if (ptMoved) return;
+  if (isPinching || pointerBlocked) return;
+
+  // Tap / click — otevři quest
+  const q = getQuestAtScreen(e.offsetX, e.offsetY);
+  if (q) selectQuest(q, e.offsetX, e.offsetY);
+});
+
+canvas.addEventListener('pointercancel', e => {
+  if (e.pointerId !== ptId) return;
+  ptDown = false;
   longPressActivated = false;
   clearTimeout(longPressTimer); longPressTimer = null;
+});
+
+canvas.addEventListener('pointerleave', e => {
+  if (e.pointerType === 'mouse') {
+    if (ptDown) { ptDown = false; canvas.classList.remove('grabbing'); }
+    hideTooltip();
+    hoveredQuestId = null;
+    requestDraw();
+  }
 });
 
 // ─── ZOOM CONTROLS ────────────────────────────────────────────────────────────
@@ -2083,6 +2097,15 @@ sidebarBackdrop.onclick = () => {
 const popup        = document.getElementById('questPopup');
 const popupBackdrop = document.getElementById('popupBackdrop');
 
+function showDepsFromPopup(questId) {
+  // Zavři popup ale zachovej selectedQuestId pro zobrazení relací
+  popup.classList.remove('open');
+  popup.style.display = 'none';
+  popupBackdrop.classList.remove('open');
+  selectedQuestId = questId;
+  requestDraw();
+}
+
 function selectQuest(q, screenX, screenY) {
   selectedQuestId = q.id;
   requestDraw();
@@ -2103,7 +2126,10 @@ function openPopup(q, screenX, screenY) {
     <button class="popup-close" id="popupClose" onclick="closePopup()">✕</button>
     <div class="popup-title">${mcToHtml(q.title)}</div>
     ${q.subtitle ? `<div class="popup-subtitle">${mcToHtml(q.subtitle)}</div>` : ''}
-    ${wikiBtn}
+    <div class="popup-header-btns">
+      <button class="popup-deps-btn" onclick="showDepsFromPopup('${escHtml(q.id)}')" title="Show dependencies">🔗</button>
+      ${wikiBtn}
+    </div>
   `;
 
   // Body
