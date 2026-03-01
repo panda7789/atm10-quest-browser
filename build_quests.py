@@ -31,6 +31,11 @@ def unescape(s):
     return s
 
 
+def normalize_lines(text):
+    """Normalizuje line endings na \\n."""
+    return text.replace('\r\n', '\n').replace('\r', '\n')
+
+
 def parse_string_value(s):
     """Parsuje quoted string ze SNBT."""
     s = s.strip()
@@ -141,8 +146,7 @@ def parse_task(block):
                 if filter_m:
                     items = re.findall(r'\bitem\(([^)]+)\)', filter_m.group(1))
                     if items:
-                        seen = set()
-                        task['filter_items'] = [x for x in items if not (x in seen or seen.add(x))]
+                        task['filter_items'] = list(dict.fromkeys(items))
         else:
             item_str = get_field_str(block, 'item')
             if item_str:
@@ -219,8 +223,8 @@ def parse_chapter_file(filepath):
     with open(filepath, encoding='utf-8') as f:
         text = f.read()
 
-    # Odstraň Windows line endings
-    text = text.replace('\r\n', '\n').replace('\r', '\n')
+    # Normalizuj line endings
+    text = normalize_lines(text)
 
     chapter = {}
 
@@ -291,13 +295,16 @@ def parse_reward(block):
 
     r = {'type': rtype}
 
-    if rtype == 'xp':
-        xp = get_field_num(block, 'xp')
-        if xp is not None: r['xp'] = int(xp)
-
-    elif rtype == 'xp_levels':
-        lvl = get_field_num(block, 'xp_levels')
-        if lvl is not None: r['xp_levels'] = int(lvl)
+    # Mapování jednoduchých numeric polí
+    simple_numeric_fields = {
+        'xp': 'xp',
+        'xp_levels': 'xp_levels',
+        'blood': 'blood'
+    }
+    if rtype in simple_numeric_fields:
+        val = get_field_num(block, rtype)
+        if val is not None:
+            r[simple_numeric_fields[rtype]] = int(val)
 
     elif rtype == 'item':
         count = get_field_num(block, 'count')
@@ -316,10 +323,6 @@ def parse_reward(block):
 
     elif rtype in ('random', 'choice', 'loot'):
         r['table'] = True  # náhodný loot table — zobrazíme jen ikonu
-
-    elif rtype == 'blood':
-        amt = get_field_num(block, 'blood')
-        if amt is not None: r['blood'] = int(amt)
 
     return r
 
@@ -400,7 +403,7 @@ def parse_lang_chapter_file(filepath):
     """
     with open(filepath, encoding='utf-8') as f:
         text = f.read()
-    text = text.replace('\r\n', '\n').replace('\r', '\n')
+    text = normalize_lines(text)
 
     data = {}
 

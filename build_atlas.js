@@ -70,7 +70,7 @@ function getUsedIds() {
 }
 
 // ─── Sestavení atlasu pomocí sharp ───────────────────────────────────────────
-async function buildAtlas(iconPaths, usedIds) {
+async function buildAtlas(iconPaths) {
   let sharp;
   try {
     sharp = require('sharp');
@@ -191,14 +191,15 @@ async function main() {
 
   // ── Task items → do atlasu (16×16) ───────────────────
   console.log('\n🔍 Hledám ikony pro task items...');
-  const found = [], missing = [];
+  const found = [];
+  let missingCount = 0;
   for (const id of taskItems) {
     const file = findIconPath(id, manifest);
     if (file) found.push({ id, file });
-    else missing.push(id);
+    else missingCount++;
   }
   console.log(`   Nalezeno: ${found.length}/${taskItems.size}`);
-  console.log(`   Chybí:    ${missing.length}`);
+  console.log(`   Chybí:    ${missingCount}`);
 
   // ── Chapter images → zkopíruj jako soubory ────────────
   console.log('\n🖼️  Zpracovávám chapter images...');
@@ -229,7 +230,7 @@ async function main() {
   console.log(`   Uloženo: chapter_images_manifest.json`);
 
   console.log(`\n🔨 Sestavuji atlas z ${found.length} ikon...`);
-  await buildAtlas(found, taskItems);
+  await buildAtlas(found);
 }
 
 main().catch(e => { console.error('❌', e.message); process.exit(1); });

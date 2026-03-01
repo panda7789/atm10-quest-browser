@@ -12,6 +12,9 @@ chapter_images_manifest.json
 node_modules/
 package-lock.json
 
+# GitHub Copilot instructions
+.github/copilot-instructions.md
+
 __pycache__/
 *.pyc
 .venv/

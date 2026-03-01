@@ -1439,7 +1439,7 @@ function selectMod(ns) {
   // Skryj mapu
   document.getElementById('mapCanvas').style.display = 'none';
   document.getElementById('emptyState').style.display = 'none';
-  document.getElementById('mapControls')?.style && (document.querySelector('.map-controls').style.display = 'none');
+  document.querySelector('.map-controls').style.display = 'none';
 }
 
 function openModQuest(chapterId, questId) {
@@ -1516,15 +1516,6 @@ function selectChapter(id) {
   fitChapter();
   requestDraw();
   hideSearch();
-
-  // DEBUG — odstraň po ověření
-  console.log('Chapter images:', activeChapter.images?.length, activeChapter.images?.[0]);
-  if (activeChapter.images?.length) {
-    const ref = activeChapter.images[0].image;
-    console.log('resolveImageUrl:', resolveImageUrl(ref));
-    console.log('FILES_MAP key exists:', FILES_MAP ? (ref in FILES_MAP) : 'FILES_MAP null');
-    console.log('imageCache has:', imageCache.has(ref), imageCache.get(ref));
-  }
 
   // Zavři sidebar na mobilu
   document.getElementById('sidebar').classList.remove('mobile-open');
@@ -2179,14 +2170,18 @@ function openPopup(q, screenX, screenY) {
         html += `<div class="reward-item"><span class="reward-xp-icon">✨</span><span class="r-name">${r.xp} XP</span></div>`;
       } else if (r.type === 'xp_levels') {
         html += `<div class="reward-item"><span class="reward-xp-icon">⭐</span><span class="r-name">${r.xp_levels} level${r.xp_levels > 1 ? 's' : ''}</span></div>`;
-      } else if (r.type === 'random') {
-        html += `<div class="reward-item"><span class="reward-xp-icon">🎲</span><span class="r-name">Random reward</span></div>`;
-      } else if (r.type === 'choice') {
-        html += `<div class="reward-item"><span class="reward-xp-icon">🎁</span><span class="r-name">Choice reward</span></div>`;
-      } else if (r.type === 'loot') {
-        html += `<div class="reward-item"><span class="reward-xp-icon">📦</span><span class="r-name">Loot reward</span></div>`;
       } else if (r.type === 'blood') {
         html += `<div class="reward-item"><span class="reward-xp-icon">🩸</span><span class="r-name">${r.blood} Blood</span></div>`;
+      } else {
+        const rewardTypes = {
+          'random': ['🎲', 'Random reward'],
+          'choice': ['🎁', 'Choice reward'],
+          'loot': ['📦', 'Loot reward']
+        };
+        if (rewardTypes[r.type]) {
+          const [emoji, text] = rewardTypes[r.type];
+          html += `<div class="reward-item"><span class="reward-xp-icon">${emoji}</span><span class="r-name">${text}</span></div>`;
+        }
       }
     }
     html += `</div>`;
@@ -2308,7 +2303,9 @@ function runSearch(query) {
 }
 
 function highlight(text, query) {
-  const idx = text.toLowerCase().indexOf(query.toLowerCase());
+  const lowerText = text.toLowerCase();
+  const lowerQuery = query.toLowerCase();
+  const idx = lowerText.indexOf(lowerQuery);
   if (idx === -1) return escHtml(text);
   return escHtml(text.slice(0, idx)) + '<mark>' + escHtml(text.slice(idx, idx + query.length)) + '</mark>' + escHtml(text.slice(idx + query.length));
 }

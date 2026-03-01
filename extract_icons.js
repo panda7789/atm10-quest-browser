@@ -192,6 +192,86 @@ function findStaticAssetDirs(modsDir) {
   return candidates.filter(p => fs.existsSync(p));
 }
 
+// ─── Zpracuj texturu z ZIP entry ──────────────────────────────────────────────
+function processTextureEntry(entry, buf, itemPaths, blockPaths, iconsDir, DATA_DIR) {
+  const m = entry.name.match(
+    /^(?:common\/src\/main\/resources\/)?assets\/([^/]+)\/textures\/(items?|blocks?)\/(.+\.png)$/
+  );
+  if (!m) return 0;
+
+  const ns = m[1];
+  const category = m[2];
+  const subpath = m[3];
+
+  const outFile = path.join(iconsDir, ns, category, subpath);
+  let extracted = 0;
+  if (!fs.existsSync(outFile)) {
+    const data = extractEntry(buf, entry);
+    if (data) {
+      fs.mkdirSync(path.dirname(outFile), { recursive: true });
+      fs.writeFileSync(outFile, data);
+      extracted = 1;
+    }
+  }
+
+  const relUrl = `icons/${ns}/${category}/${subpath}`.replace(/\\/g, '/');
+  const basename = path.basename(subpath, '.png');
+  const flatName = subpath.slice(0, -4).replace(/\//g, '_');
+  const store = (category === 'item' || category === 'items') ? itemPaths : blockPaths;
+  if (!store[`${ns}:${basename}`]) store[`${ns}:${basename}`] = relUrl;
+  if (flatName !== basename && !store[`${ns}:${flatName}`]) store[`${ns}:${flatName}`] = relUrl;
+
+  return extracted;
+}
+
+// ─── Zpracuj block model JSON ─────────────────────────────────────────────────
+function processBlockModel(entry, buf, blockModels, namespace) {
+  const mj = entry.name.match(/^assets\/([^/]+)\/models\/block\/(.+\.json)$/);
+  if (!mj) return false;
+
+  const ns = mj[1] || namespace;
+  const name = path.basename(mj[2], '.json');
+  const key = `${ns}:${name}`;
+  
+  if (blockModels[key]) return false;
+
+  const data = extractEntry(buf, entry);
+  if (!data) return false;
+
+  try {
+    const json = JSON.parse(data.toString('utf8'));
+    const tex = json.textures || {};
+    const resolve = (names) => {
+      for (const n of names) {
+        const v = tex[n];
+        if (v && typeof v === 'string' && !v.startsWith('#')) return v;
+      }
+      return null;
+    };
+    const top = resolve(['top', 'top_face', 'up', 'cap', 'end', 'all']);
+    const side = resolve(['side', 'side_face', 'texture', 'all', 'wall']);
+    const front = resolve(['front', 'face', 'front_face', 'south', 'north', 'side']);
+    const first = top || side || front ||
+      Object.values(tex).find(v => typeof v === 'string' && !v.startsWith('#'));
+    if (first) {
+      blockModels[key] = { top: top || first, side: side || first, front: front || first };
+      return true;
+    }
+  } catch {}
+  return false;
+}
+
+// ─── Nastav ikonu pokud neexistuje ────────────────────────────────────────────
+function setIconIfMissing(key, url, itemPaths, blockPaths, preferBlock) {
+  const store = preferBlock ? blockPaths : itemPaths;
+  const otherStore = preferBlock ? itemPaths : blockPaths;
+  if (!store[key] && !otherStore[key]) {
+    store[key] = url;
+    return true;
+  }
+  return false;
+}
+
 
 function main() {
   const modsDir     = findModsDir(process.argv[2]);
@@ -225,63 +305,16 @@ function main() {
 
     for (const entry of entries) {
       // ── Textury item/block ────────────────────────────────────────────────────
-      const m = entry.name.match(
-        /^(?:common\/src\/main\/resources\/)?assets\/([^/]+)\/textures\/(items?|blocks?)\/(.+\.png)$/
-      );
-      if (m) {
-        const ns       = m[1];
-        const category = m[2];
-        const subpath  = m[3];
-
-        const outFile = path.join(iconsDir, ns, category, subpath);
-        if (!fs.existsSync(outFile)) {
-          const data = extractEntry(buf, entry);
-          if (!data) continue;
-          fs.mkdirSync(path.dirname(outFile), { recursive: true });
-          fs.writeFileSync(outFile, data);
-          totalExtracted++;
-          count++;
-        }
-
-        const relUrl  = `icons/${ns}/${category}/${subpath}`.replace(/\\/g, '/');
-        const basename = path.basename(subpath, '.png');
-        const flatName = subpath.slice(0, -4).replace(/\//g, '_');
-        const store   = (category === 'item' || category === 'items') ? itemPaths : blockPaths;
-        if (!store[`${ns}:${basename}`]) store[`${ns}:${basename}`] = relUrl;
-        if (flatName !== basename && !store[`${ns}:${flatName}`]) store[`${ns}:${flatName}`] = relUrl;
+      const textureExtracted = processTextureEntry(entry, buf, itemPaths, blockPaths, iconsDir, DATA_DIR);
+      if (textureExtracted) {
+        totalExtracted++;
+        count++;
         continue;
       }
 
       // ── Block model JSONy — pro itemy bez přímé textury (např. magmator_basic) ─
-      const mj = entry.name.match(/^assets\/([^/]+)\/models\/block\/(.+\.json)$/);
-      if (mj) {
-        const ns   = mj[1];
-        const name = path.basename(mj[2], '.json');
-        const key  = `${ns}:${name}`;
-        if (!blockModels[key]) {
-          const data = extractEntry(buf, entry);
-          if (data) {
-            try {
-              const json = JSON.parse(data.toString('utf8'));
-              const tex = json.textures || {};
-              const resolve = (names) => {
-                for (const n of names) {
-                  const v = tex[n];
-                  if (v && typeof v === 'string' && !v.startsWith('#')) return v;
-                }
-                return null;
-              };
-              const top   = resolve(['top', 'top_face', 'up', 'cap', 'end', 'all']);
-              const side  = resolve(['side', 'side_face', 'texture', 'all', 'wall']);
-              const front = resolve(['front', 'face', 'front_face', 'south', 'north', 'side']);
-              const first = top || side || front ||
-                Object.values(tex).find(v => typeof v === 'string' && !v.startsWith('#'));
-              if (first) {
-                blockModels[key] = { top: top||first, side: side||first, front: front||first };
-              }
-            } catch {}
-          }
-        }
+      if (processBlockModel(entry, buf, blockModels, '')) {
+        continue;
       }
 
       // ── Entity textury ────────────────────────────────────────────────────────
@@ -305,11 +338,9 @@ function main() {
         const basename = path.basename(subpath, '.png');
         const flatName = subpath.slice(0, -4).replace(/\//g, '_');
         // Entity klíče — nepřepisuj existující item/block texturu
-        if (!itemPaths[`${ns}:${basename}`] && !blockPaths[`${ns}:${basename}`]) {
-          blockPaths[`${ns}:${basename}`] = relUrl;
-        }
-        if (flatName !== basename && !itemPaths[`${ns}:${flatName}`] && !blockPaths[`${ns}:${flatName}`]) {
-          blockPaths[`${ns}:${flatName}`] = relUrl;
+        setIconIfMissing(`${ns}:${basename}`, relUrl, itemPaths, blockPaths, true);
+        if (flatName !== basename) {
+          setIconIfMissing(`${ns}:${flatName}`, relUrl, itemPaths, blockPaths, true);
         }
       }
 
@@ -361,19 +392,20 @@ function main() {
       const entries = parseZip(buf);
       let count = 0;
       for (const entry of entries) {
-        // Textury
+        // Textury (vanilla pattern)
         const m = entry.name.match(/^assets\/minecraft\/textures\/(items?|blocks?)\/(.+\.png)$/);
         if (m) {
           const category = m[1];
           const subpath  = m[2];
           const outFile  = path.join(iconsDir, 'minecraft', category, subpath);
+          let extracted = 0;
           if (!fs.existsSync(outFile)) {
             const data = extractEntry(buf, entry);
-            if (!data) continue;
-            fs.mkdirSync(path.dirname(outFile), { recursive: true });
-            fs.writeFileSync(outFile, data);
-            totalExtracted++;
-            count++;
+            if (data) {
+              fs.mkdirSync(path.dirname(outFile), { recursive: true });
+              fs.writeFileSync(outFile, data);
+              extracted = 1;
+            }
           }
           const relUrl   = `icons/minecraft/${category}/${subpath}`.replace(/\\/g, '/');
           const basename = path.basename(subpath, '.png');
@@ -382,36 +414,14 @@ function main() {
           const store    = isItem ? itemPaths : blockPaths;
           if (!store[`minecraft:${basename}`]) store[`minecraft:${basename}`] = relUrl;
           if (flatName !== basename && !store[`minecraft:${flatName}`]) store[`minecraft:${flatName}`] = relUrl;
+          if (extracted) totalExtracted++;
+          count++;
           continue;
         }
 
         // Block model JSONy (pro vanilla bloky jako snow_block → snow textura)
-        const mj = entry.name.match(/^assets\/minecraft\/models\/block\/(.+\.json)$/);
-        if (mj) {
-          const name = path.basename(mj[1], '.json');
-          const key  = `minecraft:${name}`;
-          if (!blockModels[key]) {
-            const data = extractEntry(buf, entry);
-            if (data) {
-              try {
-                const json = JSON.parse(data.toString('utf8'));
-                const tex = json.textures || {};
-                const resolve = (names) => {
-                  for (const n of names) {
-                    const v = tex[n];
-                    if (v && typeof v === 'string' && !v.startsWith('#')) return v;
-                  }
-                  return null;
-                };
-                const top   = resolve(['top', 'end', 'all', 'up']);
-                const side  = resolve(['side', 'texture', 'all', 'wall']);
-                const front = resolve(['front', 'face', 'south', 'north', 'side']);
-                const first = top || side || front ||
-                  Object.values(tex).find(v => typeof v === 'string' && !v.startsWith('#'));
-                if (first) blockModels[key] = { top: top||first, side: side||first, front: front||first };
-              } catch {}
-            }
-          }
+        if (processBlockModel(entry, buf, blockModels, 'minecraft')) {
+          continue;
         }
       }
       console.log(`   Extrahováno: ${count} vanilla textur`);
@@ -484,10 +494,7 @@ function main() {
   console.log(`   Doplněno UV: ${geoResolved}`);
 
   // ─── Skenuj KubeJS a další statické asset složky ─────────────────────────
-  const staticDirs = [
-    path.join(instanceDir, 'kubejs', 'assets'),
-    path.join(instanceDir, 'resourcepacks'),
-  ];
+  const staticDirs = findStaticAssetDirs(modsDir);
 
   for (const staticDir of staticDirs) {
     if (!fs.existsSync(staticDir)) continue;
